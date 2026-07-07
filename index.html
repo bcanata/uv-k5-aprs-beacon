@@ -148,6 +148,10 @@
   .clearlink{display:inline-block;margin-top:.55rem;font:600 .68rem/1 ui-monospace,Menlo,monospace;letter-spacing:.04em;
              color:var(--muted);background:none;border:0;cursor:pointer;text-decoration:underline;}
   .clearlink:hover{color:var(--warn);}
+  .site-foot{margin-top:2rem;padding-top:1rem;border-top:1px solid var(--line);text-align:center;
+             font:600 .7rem/1.5 ui-monospace,Menlo,monospace;letter-spacing:.05em;color:var(--muted);}
+  .site-foot a{color:var(--accent);text-decoration:none;}
+  .site-foot a:hover{text-decoration:underline;}
   #rcConnect.connected{background:var(--ok);color:#04120a;}
   #rcPtt{background:var(--warn);color:#fff;touch-action:none;}
   #rcPtt.tx{background:#d11;box-shadow:0 0 0 3px rgba(209,17,17,.3);}
@@ -204,7 +208,7 @@
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </div>
-  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b10</div>
+  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b11</div>
 
   <nav class="tabs">
     <a id="tab-install" href="#install" data-i18n="nav.install">Install</a>
@@ -519,6 +523,12 @@
     </div>
   </div>
 
+  <footer class="site-foot">
+    <span data-i18n="foot.tag">Open source.</span>
+    <a href="https://github.com/bcanata/uv-k5-firmware-ta1js" target="_blank" rel="noopener" data-i18n="foot.fw">Firmware</a> ·
+    <a href="https://github.com/bcanata/uv-k5-aprs-beacon" target="_blank" rel="noopener" data-i18n="foot.web">Web tools</a>
+  </footer>
+
 </div>
 
 <script src="k5.js?v=6"></script>
@@ -535,6 +545,7 @@ var T = {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Edition (TA1JS)" },
     nav: { install: "Install", beacon: "Web Beacon", code: "Codes", control: "Control", channels: "Channels", settings: "Settings" },
+    foot: { tag: "Open source.", fw: "Firmware source", web: "Web tools source" },
     ap: {
       h1: "APRS",
       lede: "Live APRS monitor and messaging over USB. Keep the radio on 144.800 MHz with menu APRS = ON.",
@@ -785,6 +796,7 @@ var T = {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Sürümü (TA1JS)" },
     nav: { install: "Kurulum", beacon: "Canlı Beacon", code: "Kodlar", control: "Kontrol", channels: "Kanallar", settings: "Ayarlar" },
+    foot: { tag: "Açık kaynak.", fw: "Firmware kaynağı", web: "Web araçları kaynağı" },
     ap: {
       h1: "APRS",
       lede: "USB üzerinden canlı APRS izleme ve mesajlaşma. Telsizi 144.800 MHz'de, menüde APRS = ON tutun.",
@@ -1139,7 +1151,7 @@ window.addEventListener("hashchange", routeFromHash);
       var ver = null;
       for (var attempt = 0; attempt < 3 && !ver; attempt++) ver = await radio.hello();
       if (!ver){
-        // DIAGNOSTIC (build b10): resend hello and dump whatever the radio returns, raw.
+        // DIAGNOSTIC (build b11): resend hello and dump whatever the radio returns, raw.
         // 0 bytes => the reply isn't reaching the browser; N bytes => a parse issue.
         var got = new Uint8Array(0);
         try {
@@ -1151,7 +1163,7 @@ window.addEventListener("hashchange", routeFromHash);
           }
         } catch(e){}
         var hex = Array.prototype.map.call(got, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
-        $("raw").value = "DIAG build b10 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
+        $("raw").value = "DIAG build b11 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
         $("raw").style.display = "block";
         st("stConnect", S.noAnswer, "err");
         try { await t.disconnect(); } catch(_e){}
