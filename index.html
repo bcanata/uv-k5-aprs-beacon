@@ -194,8 +194,6 @@ function makeWebUsb(showAll) {
         if (e.direction === "out") epOut = e.endpointNumber;
       });
       if (!epOut) throw new Error("no OUT endpoint found on the adapter");
-      // clear any stuck state from a previous session before configuring
-      try { await dev.reset(); } catch (e) {}
       await ch340Init();
     },
     send: async function (bytes) { await dev.transferOut(epOut, bytes); }
