@@ -54,6 +54,7 @@
 
   <button id="connect" class="big" type="button">Connect Radio</button>
   <p class="status" id="connStatus"></p>
+  <a href="#" id="showall" style="display:none;font-size:.82rem;color:var(--accent)">Show all USB devices</a>
 
   <button id="beacon" class="big" type="button" disabled>Beacon My Location</button>
   <p class="status" id="txStatus" role="status"></p>
@@ -130,7 +131,7 @@ function makeWebSerial() {
 }
 
 // minimal CH340 driver over WebUSB (baud 38400, 8N1)
-function makeWebUsb() {
+function makeWebUsb(showAll) {
   var dev = null, epOut = 0;
   async function ctrl(req, val, idx) {
     await dev.controlTransferOut(
@@ -143,19 +144,27 @@ function makeWebUsb() {
     await ctrl(0x9A, 0x0F2C, 0x0008);  // LCR: 8 data bits, no parity, 1 stop
     await ctrl(0xA1, 0x501F, 0xD90A);  // modem/handshake
   }
+  // common USB-serial adapters (CH340/CH910x, CP210x, FTDI, PL2303)
+  var filters = showAll ? [] : [
+    { vendorId: 0x1A86 }, { vendorId: 0x10C4 },
+    { vendorId: 0x0403 }, { vendorId: 0x067B }
+  ];
   return {
-    name: "WebUSB (CH340)",
+    name: "WebUSB",
     connect: async function () {
-      dev = await navigator.usb.requestDevice({ filters: [
-        { vendorId: 0x1A86 }  // QinHeng CH340/CH341
-      ]});
+      dev = await navigator.usb.requestDevice({ filters: filters });
       await dev.open();
       if (dev.configuration === null) await dev.selectConfiguration(1);
       var iface = dev.configuration.interfaces[0];
-      await dev.claimInterface(iface.interfaceNumber);
+      try {
+        await dev.claimInterface(iface.interfaceNumber);
+      } catch (e) {
+        throw new Error("adapter busy — Android's built-in serial driver likely claimed it; this phone/Android version may not allow WebUSB serial");
+      }
       iface.alternates[0].endpoints.forEach(function (e) {
         if (e.direction === "out") epOut = e.endpointNumber;
       });
+      if (!epOut) throw new Error("no OUT endpoint found on the adapter");
       await ch340Init();
     },
     send: async function (bytes) { await dev.transferOut(epOut, bytes); }
@@ -174,22 +183,42 @@ var metaEl     = document.getElementById("meta");
 function setConn(msg, cls) { connStatus.textContent = msg; connStatus.className = "status " + (cls || ""); }
 function setTx(msg, cls)   { txStatus.textContent = msg;   txStatus.className   = "status " + (cls || ""); }
 
+var isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+async function tryConnect(makeTransport) {
+  transport = makeTransport();
+  setConn("Choose the radio's USB adapter in the dialog…");
+  await transport.connect();
+  setConn("Connected via " + transport.name + ".", "ok");
+  connectBtn.classList.add("connected");
+  connectBtn.textContent = "Radio Connected";
+  beaconBtn.disabled = false;
+}
+
 connectBtn.addEventListener("click", async function () {
   try {
-    if ("serial" in navigator)      transport = makeWebSerial();
-    else if ("usb" in navigator)    transport = makeWebUsb();
-    else { setConn("This browser has neither Web Serial nor WebUSB (iOS is not supported).", "err"); return; }
-
-    setConn("Choose the radio's USB adapter…");
-    await transport.connect();
-    setConn("Connected via " + transport.name + ".", "ok");
-    connectBtn.classList.add("connected");
-    connectBtn.textContent = "Radio Connected";
-    beaconBtn.disabled = false;
+    // Web Serial is desktop-only; on mobile always use WebUSB.
+    if (!isMobile && ("serial" in navigator)) await tryConnect(makeWebSerial);
+    else if ("usb" in navigator)              await tryConnect(function () { return makeWebUsb(false); });
+    else if ("serial" in navigator)           await tryConnect(makeWebSerial);
+    else { setConn("This browser supports neither WebUSB nor Web Serial. iOS cannot do this; on Android use Chrome.", "err"); }
   } catch (e) {
-    setConn("Connection failed: " + (e && e.message ? e.message : e), "err");
+    var msg = (e && e.message) ? e.message : String(e);
+    if (/No device selected|cancell/i.test(msg))
+      setConn("No adapter picked. If the list was empty, tap “Show all USB devices” below.", "err");
+    else
+      setConn("Connection failed: " + msg, "err");
     transport = null;
+    showAllLink.style.display = ("usb" in navigator) ? "inline" : "none";
   }
+});
+
+// fallback: show every USB device (in case the adapter's VID isn't in the filter)
+var showAllLink = document.getElementById("showall");
+showAllLink.addEventListener("click", async function (ev) {
+  ev.preventDefault();
+  try { await tryConnect(function () { return makeWebUsb(true); }); showAllLink.style.display = "none"; }
+  catch (e) { setConn("Still failed: " + ((e && e.message) ? e.message : e), "err"); }
 });
 
 beaconBtn.addEventListener("click", function () {
@@ -222,8 +251,14 @@ beaconBtn.addEventListener("click", function () {
 });
 
 // hint about support up front
-if (!("serial" in navigator) && !("usb" in navigator))
-  setConn("Not supported in this browser. Use desktop Chrome/Edge, or Android Chrome with USB-OTG. iOS cannot do this.", "err");
+if (!("serial" in navigator) && !("usb" in navigator)) {
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent))
+    setConn("iOS browsers cannot access USB serial. Use a desktop, or an Android phone with Chrome + OTG.", "err");
+  else
+    setConn("This browser has no WebUSB/Web Serial. Use Chrome (desktop or Android).", "err");
+} else if (isMobile && !("usb" in navigator)) {
+  setConn("This mobile browser lacks WebUSB. Use Chrome for Android.", "err");
+}
 </script>
 </body>
 </html>
