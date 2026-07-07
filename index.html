@@ -121,7 +121,9 @@
   button.rk .sub{display:block;font:600 .52rem/1.2 ui-monospace,Menlo,monospace;color:var(--muted);letter-spacing:.05em;margin-top:.15rem;}
   button.rk:active .sub{color:var(--accent-ink);}
   button.rk.wide{grid-column:span 1;}
-  #rcConnect{background:var(--ink);color:var(--bg);}
+  #rcConnect,#chConnect,#seConnect{background:var(--ink);color:var(--bg);}
+  #rcConnect.connected,#chConnect.connected,#seConnect.connected{background:var(--ok);color:#04120a;}
+  .selabel{}
   #rcConnect.connected{background:var(--ok);color:#04120a;}
   #rcPtt{background:var(--warn);color:#fff;touch-action:none;}
   #rcPtt.tx{background:#d11;box-shadow:0 0 0 3px rgba(209,17,17,.3);}
@@ -178,7 +180,7 @@
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </div>
-  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b8</div>
+  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b9</div>
 
   <nav class="tabs">
     <a id="tab-install" href="#install" data-i18n="nav.install">Install</a>
@@ -186,7 +188,7 @@
     <a id="tab-code"    href="#code"    data-i18n="nav.code">Codes</a>
     <a id="tab-control" href="#control" data-i18n="nav.control">Control</a>
     <a id="tab-channels" href="#channels" data-i18n="nav.channels">Channels</a>
-    <a id="tab-eeprom" href="#eeprom" data-i18n="nav.eeprom">EEPROM</a>
+    <a id="tab-settings" href="#settings" data-i18n="nav.settings">Settings</a>
   </nav>
 
   <!-- =============================== INSTALL =============================== -->
@@ -419,27 +421,25 @@
     </div>
   </section>
 
-  <!-- =============================== EEPROM =============================== -->
-  <section class="view" id="view-eeprom">
-    <h1 data-i18n="eep.h1">EEPROM Editor</h1>
-    <p class="lede" data-i18n="eep.lede"></p>
-    <div class="note warn" data-i18n-html="eep.warn"></div>
+  <!-- =============================== SETTINGS =============================== -->
+  <section class="view" id="view-settings">
+    <h1 data-i18n="set.h1">Settings</h1>
+    <p class="lede" data-i18n="set.lede"></p>
 
-    <button id="epConnect" class="big" type="button" data-i18n="eep.connect"></button>
-    <p class="status" id="epStatus"></p>
+    <button id="seConnect" class="big" type="button" data-i18n="set.connect"></button>
+    <p class="status" id="seStatus"></p>
 
-    <div id="epPanel" style="display:none">
-      <div class="hexbar">
-        <button class="act" id="epRead" data-i18n="eep.read"></button>
-        <button class="act" id="epWrite" disabled data-i18n="eep.write"></button>
-        <label class="hexjump"><span data-i18n="eep.jump"></span><input id="epJump" maxlength="4" placeholder="0E30"></label>
+    <div id="sePanel" style="display:none">
+      <div class="ch-actions">
+        <button class="act" id="seRead" data-i18n="set.read"></button>
+        <button class="act" id="seWrite" disabled data-i18n="set.write"></button>
+        <button class="act dark" id="seRestore" data-i18n="set.restore"></button>
+        <input type="file" id="seFile" accept=".bin" style="display:none">
       </div>
-      <div class="bar" id="epBar"><i></i></div>
-      <p class="status" id="epProgress"></p>
-      <div class="hexwrap" id="epWrap" style="display:none">
-        <table class="hex"><tbody id="epBody"></tbody></table>
-      </div>
-      <p class="fine" data-i18n-html="eep.fine"></p>
+      <div class="bar" id="seBar"><i></i></div>
+      <p class="status" id="seProgress"></p>
+      <div id="seForm"></div>
+      <p class="fine" data-i18n-html="set.fine"></p>
     </div>
   </section>
 
@@ -486,7 +486,30 @@ var T = {
   en: {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Edition (TA1JS)" },
-    nav: { install: "Install", beacon: "Web Beacon", code: "Codes", control: "Control", channels: "Channels", eeprom: "EEPROM" },
+    nav: { install: "Install", beacon: "Web Beacon", code: "Codes", control: "Control", channels: "Channels", settings: "Settings" },
+    set: {
+      h1: "Settings",
+      lede: "Read every setting from the radio, change any of them, and write them back over USB.",
+      connect: "Connect Radio", connected: "Connected",
+      read: "Read settings", write: "Write changes", restore: "Restore backup (.bin)",
+      fine: "Values are read from the radio on Read; change any control and Write saves only the affected 8-byte pages (calibration is never touched). Power-cycle the radio to apply. Restore writes a whole backup's settings + channels (0x0000–0x1E00).",
+      st: {
+        connecting: "Connecting…",
+        connected: function(v){ return "Connected: " + v; },
+        connFail: "Connection failed.",
+        portBusy: "The serial port is already open — close any other tab using the radio, then retry.",
+        reading: function(d,t){ return "Reading settings " + Math.round(d*100/t) + "%…"; },
+        readDone: "Settings read. Change anything, then Write changes.",
+        noChanges: "No changes to write.",
+        writing: function(d,t){ return "Writing " + d + "/" + t + " pages…"; },
+        writeDone: "Saved — power-cycle the radio to apply.",
+        writeFail: function(e){ return "Write failed: " + e; },
+        restoreConfirm: "Restore overwrites ALL settings and channels with this backup. Calibration is kept. Continue?",
+        restoreBad: "That file isn't a valid UV-K5 EEPROM backup (need at least 7.5 KB).",
+        restoreWriting: function(d,t){ return "Restoring " + Math.round(d*100/t) + "%…"; },
+        restoreDone: "Backup restored — power-cycle the radio to apply."
+      }
+    },
     install: {
       h1: "Firmware Installer",
       lede: "Flashes the UV-K5 APRS firmware and configures it entirely in your browser over the programming cable — back up, wipe, flash, and set your callsign & position. Nothing to install.",
@@ -665,8 +688,8 @@ var T = {
       lede: "Read the radio's entire 8 KB EEPROM and edit any byte, then write your changes back over USB.",
       warn: "<b>Expert tool.</b> Editing raw EEPROM can corrupt your settings — <b>back up first</b> (Install → Back Up). The calibration region <code>0x1E00–0x1FFF</code> is per-radio and irreplaceable; rows there are marked and need an extra confirm to write.",
       connect: "Connect Radio", connected: "Connected",
-      read: "Read EEPROM", write: "Write changes", jump: "Go to",
-      fine: "Each row is 16 bytes of hex (space-separated) with its address and ASCII. Edit the hex, then Write changes — only rows you touched are written, 8 bytes at a time. Changed rows are highlighted; invalid rows turn red.",
+      read: "Read EEPROM", write: "Write changes", restore: "Restore .bin", jump: "Go to",
+      fine: "Each row is 16 bytes of hex (space-separated) with its address and ASCII. Edit the hex, then Write changes — only rows you touched are written, 8 bytes at a time. Restore writes a whole backup's settings (0x0000–0x1E00) back; calibration is never touched.",
       st: {
         connecting: "Connecting…",
         connected: function(v){ return "Connected: " + v; },
@@ -679,7 +702,11 @@ var T = {
         badRows: "Some rows aren't valid 16-byte hex — fix the red rows first.",
         writing: function(d,t){ return "Writing " + d + "/" + t + " rows…"; },
         writeDone: function(n){ return n + " rows written — power-cycle the radio to apply."; },
-        writeFail: function(e){ return "Write failed: " + e; }
+        writeFail: function(e){ return "Write failed: " + e; },
+        restoreConfirm: "Restore overwrites ALL settings (channels, config) with this backup. Calibration is kept. Continue?",
+        restoreBad: "That file isn't a valid UV-K5 EEPROM backup (need ≥ 7.5 KB).",
+        restoreWriting: function(d,t){ return "Restoring " + Math.round(d*100/t) + "%…"; },
+        restoreDone: "Backup restored — power-cycle the radio to apply."
       }
     }
   },
@@ -687,7 +714,30 @@ var T = {
   tr: {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Sürümü (TA1JS)" },
-    nav: { install: "Kurulum", beacon: "Canlı Beacon", code: "Kodlar", control: "Kontrol", channels: "Kanallar" },
+    nav: { install: "Kurulum", beacon: "Canlı Beacon", code: "Kodlar", control: "Kontrol", channels: "Kanallar", settings: "Ayarlar" },
+    set: {
+      h1: "Ayarlar",
+      lede: "Telsizdeki her ayarı oku, dilediğini değiştir ve USB üzerinden geri yaz.",
+      connect: "Telsizi Bağla", connected: "Bağlandı",
+      read: "Ayarları oku", write: "Değişiklikleri yaz", restore: "Yedeği geri yükle (.bin)",
+      fine: "Değerler Oku ile telsizden okunur; bir kontrolü değiştir, Yaz yalnızca etkilenen 8-baytlık sayfaları kaydeder (kalibrasyona dokunulmaz). Uygulamak için telsizi kapatıp aç. Geri yükleme bir yedeğin tüm ayar + kanallarını (0x0000–0x1E00) yazar.",
+      st: {
+        connecting: "Bağlanıyor…",
+        connected: function(v){ return "Bağlandı: " + v; },
+        connFail: "Bağlantı başarısız.",
+        portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeyi kapatıp tekrar deneyin.",
+        reading: function(d,t){ return "Ayarlar okunuyor %" + Math.round(d*100/t) + "…"; },
+        readDone: "Ayarlar okundu. Bir şeyi değiştir, sonra Değişiklikleri yaz.",
+        noChanges: "Yazılacak değişiklik yok.",
+        writing: function(d,t){ return "Sayfa yazılıyor " + d + "/" + t + "…"; },
+        writeDone: "Kaydedildi — uygulamak için telsizi kapatıp açın.",
+        writeFail: function(e){ return "Yazma başarısız: " + e; },
+        restoreConfirm: "Geri yükleme TÜM ayarları ve kanalları bu yedekle değiştirir. Kalibrasyon korunur. Devam edilsin mi?",
+        restoreBad: "Bu dosya geçerli bir UV-K5 EEPROM yedeği değil (en az 7.5 KB gerekir).",
+        restoreWriting: function(d,t){ return "Geri yükleniyor %" + Math.round(d*100/t) + "…"; },
+        restoreDone: "Yedek geri yüklendi — uygulamak için telsizi kapatıp açın."
+      }
+    },
     install: {
       h1: "Firmware Kurulumu",
       lede: "UV-K5 APRS firmware'ini tarayıcınızdan programlama kablosuyla yükler ve yapılandırır — yedekle, temizle, yükle, çağrı işareti ve konumunu ayarla. Kurulacak yazılım yok.",
@@ -917,7 +967,7 @@ function applyLang(){
 })();
 
 /* ======================= view routing ======================= */
-var VIEWS = ["install", "beacon", "code", "control", "channels", "eeprom"];
+var VIEWS = ["install", "beacon", "code", "control", "channels", "settings"];
 function showView(name){
   if (VIEWS.indexOf(name) < 0) name = "install";
   for (var i = 0; i < VIEWS.length; i++){
@@ -997,7 +1047,7 @@ window.addEventListener("hashchange", routeFromHash);
       var ver = null;
       for (var attempt = 0; attempt < 3 && !ver; attempt++) ver = await radio.hello();
       if (!ver){
-        // DIAGNOSTIC (build b8): resend hello and dump whatever the radio returns, raw.
+        // DIAGNOSTIC (build b9): resend hello and dump whatever the radio returns, raw.
         // 0 bytes => the reply isn't reaching the browser; N bytes => a parse issue.
         var got = new Uint8Array(0);
         try {
@@ -1009,7 +1059,7 @@ window.addEventListener("hashchange", routeFromHash);
           }
         } catch(e){}
         var hex = Array.prototype.map.call(got, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
-        $("raw").value = "DIAG build b8 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
+        $("raw").value = "DIAG build b9 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
         $("raw").style.display = "block";
         st("stConnect", S.noAnswer, "err");
         try { await t.disconnect(); } catch(_e){}
@@ -1669,99 +1719,170 @@ window.addEventListener("hashchange", routeFromHash);
   onLang(function(){ chConnect.textContent = connected ? D().chan.connected : D().chan.connect; });
 })();
 
-/* ======================= EEPROM HEX EDITOR ======================= */
+/* ======================= SETTINGS EDITOR ======================= */
 (function(){
-  var radio = null, connected = false, mem = null, dirty = new Set();
-  var epConnect = $("epConnect");
-  function epSt(m,c){ var e=$("epStatus"); e.textContent=m; e.className="status "+(c||""); }
-  function epProg(m,c){ var e=$("epProgress"); e.textContent=m; e.className="status "+(c||""); }
-  function epBar(d,t){ var b=$("epBar"); b.classList.add("on"); b.firstElementChild.style.width=(t?Math.round(d*100/t):0)+"%"; }
-  function hx2(b){ return ("0"+(b&0xFF).toString(16)).slice(-2).toUpperCase(); }
-  function esc(s){ return s.replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
-  function hexRow(a){ var s=""; for(var i=0;i<16;i++) s+=(i?" ":"")+hx2(mem[a+i]); return s; }
-  function asciiRow(a){ var s=""; for(var i=0;i<16;i++){ var c=mem[a+i]; s+=(c>=32&&c<127)?String.fromCharCode(c):"."; } return s; }
+  var radio=null, connected=false, mem=null, dirty=new Set();
+  var seConnect=$("seConnect");
+  function seSt(m,c){ var e=$("seStatus"); e.textContent=m; e.className="status "+(c||""); }
+  function seProg(m,c){ var e=$("seProgress"); e.textContent=m; e.className="status "+(c||""); }
+  function seBar(d,t){ var b=$("seBar"); b.classList.add("on"); b.firstElementChild.style.width=(t?Math.round(d*100/t):0)+"%"; }
+  function markPage(a){ dirty.add(a & ~7); }
+  function markRange(a,n){ for(var p=a & ~7; p<a+n; p+=8) dirty.add(p); }
 
-  function render(){
-    var rows=[];
-    for(var a=0;a<0x2000;a+=16){
-      rows.push("<tr class='r"+(a>=0x1E00?" calib":"")+"'>"+
-        "<td class='ad'>"+hx2(a>>8)+hx2(a&0xFF)+"</td>"+
-        "<td><input class='hx' spellcheck='false' autocomplete='off' data-a='"+a+"' value='"+hexRow(a)+"'></td>"+
-        "<td class='as' id='as"+a+"'>"+esc(asciiRow(a))+"</td></tr>");
-    }
-    $("epBody").innerHTML = rows.join("");
-    $("epWrap").style.display="block";
+  // accessors on the in-memory 8 KB image (read-modify-write per 8-byte page)
+  function gB(a){ return function(m){ return m[a]; }; }
+  function sB(a){ return function(m,v){ m[a]=v&0xFF; markPage(a); }; }
+  function gLo(a){ return function(m){ return m[a]&0x0F; }; }
+  function sLo(a){ return function(m,v){ m[a]=(m[a]&0xF0)|(v&0x0F); markPage(a); }; }
+  function gHi(a){ return function(m){ return (m[a]>>4)&0x0F; }; }
+  function sHi(a){ return function(m,v){ m[a]=(m[a]&0x0F)|((v&0x0F)<<4); markPage(a); }; }
+  function gBit(a,b){ return function(m){ return (m[a]>>b)&1; }; }
+  function sBit(a,b){ return function(m,v){ m[a]=(m[a]&~(1<<b))|((v?1:0)<<b); markPage(a); }; }
+  // APRS text/coords
+  function gCall(m){ var s=""; for(var i=0;i<6;i++){ var c=m[0x0E33+i]; if(c<=32||c>=127)break; s+=String.fromCharCode(c);} return s; }
+  function sCall(m,v){ v=(v||"").toUpperCase().slice(0,6); for(var i=0;i<7;i++) m[0x0E33+i]=(i<v.length)?v.charCodeAt(i):0; markRange(0x0E33,7); }
+  function gMsg(m){ var s=""; for(var i=0;i<10;i++){ var c=m[0x0F24+i]; if(c<=32||c>=127)break; s+=String.fromCharCode(c);} return s; }
+  function sMsg(m,v){ v=(v||"").toUpperCase().slice(0,9); for(var i=0;i<10;i++) m[0x0F24+i]=(i<v.length)?v.charCodeAt(i):0; markRange(0x0F24,10); }
+  function gDeg(a){ return function(m){ return (new DataView(m.buffer,m.byteOffset+a,4)).getInt32(0,true)/1e6; }; }
+  function sDeg(a){ return function(m,v){ (new DataView(m.buffer,m.byteOffset+a,4)).setInt32(0, Math.round((parseFloat(v)||0)*1e6), true); markRange(a,4); }; }
+
+  function G(en,tr){ return {en:en,tr:tr}; }
+  function L(o){ return (LANG==="tr" && o.tr) ? o.tr : o.en; }
+
+  var GROUPS = [
+    { t:G("APRS","APRS"), f:[
+      {id:"call",  l:G("Callsign","Çağrı işareti"),  type:"text", max:6, get:gCall, set:sCall},
+      {id:"ssid",  l:G("SSID","SSID"),               type:"int", min:0, max:15, get:gB(0x0E32), set:sB(0x0E32)},
+      {id:"lat",   l:G("Latitude °","Enlem °"),      type:"deg", wide:1, get:gDeg(0x0E3A), set:sDeg(0x0E3A)},
+      {id:"lon",   l:G("Longitude °","Boylam °"),    type:"deg", wide:1, get:gDeg(0x0F20), set:sDeg(0x0F20)},
+      {id:"aon",   l:G("Listen on boot","Açılışta dinle"), type:"enum", o:["Off","On"], ot:["Kapalı","Açık"], get:gB(0x0E30), set:sB(0x0E30)},
+      {id:"intv",  l:G("Beacon interval (min)","Beacon aralığı (dk)"), type:"int", min:0, max:60, get:gB(0x0E31), set:sB(0x0E31)},
+      {id:"msg",   l:G("Message target","Mesaj hedefi"), type:"text", max:9, wide:1, get:gMsg, set:sMsg}
+    ]},
+    { t:G("Radio","Telsiz"), f:[
+      {id:"sql",   l:G("Squelch","Susturucu"),       type:"int", min:0, max:9, get:gB(0x0E71), set:sB(0x0E71)},
+      {id:"pwr",   l:G("TX power","TX gücü"),        type:"enum", o:["<20mW","125mW","250mW","500mW","1W","2W","5W"], get:gHi(0x1FF7), set:sHi(0x1FF7)},
+      {id:"ptt",   l:G("PTT mode","PTT modu"),       type:"enum", o:["Classic","One-push"], ot:["Klasik","Tek-bas"], get:gLo(0x1FF7), set:sLo(0x1FF7)},
+      {id:"txvfo", l:G("TX VFO","TX VFO"),           type:"enum", o:["A","B"], get:gB(0x0EAB), set:sB(0x0EAB)},
+      {id:"batsav",l:G("Battery save","Pil tasarrufu"), type:"enum", o:["Off","1:1","1:2","1:3","1:4","1:5"], ot:["Kapalı","1:1","1:2","1:3","1:4","1:5"], get:gB(0x0E7B), set:sB(0x0E7B)},
+      {id:"battyp",l:G("Battery type","Pil tipi"),   type:"enum", o:["1600 mAh","2200 mAh","3500 mAh"], get:gB(0x0EAC), set:sB(0x0EAC)}
+    ]},
+    { t:G("Display & audio","Ekran & ses"), f:[
+      {id:"blmax", l:G("Backlight max","Arka ışık maks"), type:"int", min:1, max:10, get:gLo(0x0E78), set:sLo(0x0E78)},
+      {id:"blmin", l:G("Backlight min","Arka ışık min"),  type:"int", min:0, max:9, get:gHi(0x0E78), set:sHi(0x0E78)},
+      {id:"abr",   l:G("Backlight time (s, 0=off)","Arka ışık süresi (sn, 0=kapalı)"), type:"int", min:0, max:61, get:gB(0x0E7D), set:sB(0x0E7D)},
+      {id:"mdf",   l:G("Channel display","Kanal görünümü"), type:"enum", o:["Frequency","Channel #","Name","Name + freq"], ot:["Frekans","Kanal #","Ad","Ad + frekans"], get:gB(0x0E79), set:sB(0x0E79)},
+      {id:"pon",   l:G("Power-on screen","Açılış ekranı"), type:"enum", o:["All","Sound","Message","Voltage","None"], ot:["Hepsi","Ses","Mesaj","Voltaj","Yok"], get:gB(0x0E97), set:sB(0x0E97)},
+      {id:"beep",  l:G("Key beep","Tuş sesi"),       type:"enum", o:["Off","On"], ot:["Kapalı","Açık"], get:gBit(0x0E90,0), set:sBit(0x0E90,0)},
+      {id:"roger", l:G("Roger beep","Roger sesi"),   type:"enum", o:["Off","Roger","MDC"], ot:["Kapalı","Roger","MDC"], get:gB(0x0EA9), set:sB(0x0EA9)},
+      {id:"ctr",   l:G("Contrast","Kontrast"),       type:"int", min:1, max:15, get:gLo(0x1FF5), set:sLo(0x1FF5)},
+      {id:"smet",  l:G("S-meter style","S-metre stili"), type:"enum", o:["Tiny","Classic"], ot:["Küçük","Klasik"], get:gBit(0x1FF5,6), set:sBit(0x1FF5,6)},
+      {id:"gui",   l:G("UI style","Arayüz stili"),   type:"enum", o:["Tiny","Classic"], ot:["Küçük","Klasik"], get:gBit(0x1FF5,7), set:sBit(0x1FF5,7)},
+      {id:"inv",   l:G("Invert LCD","LCD ters"),     type:"enum", o:["Off","On"], ot:["Kapalı","Açık"], get:gBit(0x1FF5,4), set:sBit(0x1FF5,4)}
+    ]},
+    { t:G("TX alerts","TX uyarıları"), f:[
+      {id:"tot",   l:G("TX timeout alert","TX zaman aşımı uyarısı"), type:"enum", o:["Off","Sound","Visual","All"], ot:["Kapalı","Ses","Görsel","Hepsi"], get:gHi(0x1FF6), set:sHi(0x1FF6)},
+      {id:"eot",   l:G("End-of-TX alert","TX sonu uyarısı"), type:"enum", o:["Off","Sound","Visual","All"], ot:["Kapalı","Ses","Görsel","Hepsi"], get:gLo(0x1FF6), set:sLo(0x1FF6)}
+    ]}
+  ];
+
+  function buildForm(){
+    var form=$("seForm"); if(!form) return; form.innerHTML="";
+    GROUPS.forEach(function(g){
+      var h=document.createElement("h2"); h.className="sec"; h.textContent=L(g.t); form.appendChild(h);
+      var grid=document.createElement("div"); grid.className="grid";
+      g.f.forEach(function(fld){
+        var lab=document.createElement("label"); lab.className="f"+(fld.wide?" wide":"");
+        var sp=document.createElement("span"); sp.textContent=L(fld.l); lab.appendChild(sp);
+        var c;
+        if(fld.type==="enum"){
+          c=document.createElement("select");
+          var opts=(LANG==="tr"&&fld.ot)?fld.ot:fld.o;
+          opts.forEach(function(o,i){ var op=document.createElement("option"); op.value=i; op.textContent=o; c.appendChild(op); });
+        } else {
+          c=document.createElement("input");
+          if(fld.type==="int"){ c.type="number"; c.min=fld.min; c.max=fld.max; }
+          else if(fld.type==="deg"){ c.type="text"; c.inputMode="decimal"; c.placeholder="0.000000"; }
+          else { c.maxLength=fld.max; c.autocomplete="off"; c.spellcheck=false; }
+        }
+        c.id="se_"+fld.id; c.disabled=!mem;
+        c.addEventListener("change", function(){ if(!mem) return; var v=(fld.type==="enum"||fld.type==="int")?parseInt(c.value,10):c.value; fld.set(mem,v); });
+        lab.appendChild(c); grid.appendChild(lab);
+      });
+      form.appendChild(grid);
+    });
+    if(mem) populate();
   }
 
-  $("epBody").addEventListener("input", function(ev){
-    var inp=ev.target; if(!inp.classList||!inp.classList.contains("hx")) return;
-    var a=parseInt(inp.dataset.a,10);
-    var toks=inp.value.trim().split(/\s+/);
-    if(toks.length!==16 || !toks.every(function(t){ return /^[0-9a-fA-F]{1,2}$/.test(t); })){
-      inp.classList.add("bad"); return;
-    }
-    inp.classList.remove("bad");
-    for(var i=0;i<16;i++) mem[a+i]=parseInt(toks[i],16)&0xFF;
-    var as=$("as"+a); if(as) as.textContent=asciiRow(a);
-    inp.classList.add("dirty"); dirty.add(a);
-  });
-
-  function doJump(){
-    var a=parseInt(($("epJump").value||"").replace(/[^0-9a-fA-F]/g,""),16);
-    if(isNaN(a)) return;
-    a &= ~0xF; if(a<0)a=0; if(a>0x1FF0)a=0x1FF0;
-    var inp=$("epBody").querySelector("input[data-a='"+a+"']");
-    if(inp){ inp.scrollIntoView({block:"center"}); inp.focus(); }
+  function populate(){
+    GROUPS.forEach(function(g){ g.f.forEach(function(fld){
+      var c=$("se_"+fld.id); if(!c) return;
+      var v=fld.get(mem);
+      c.value=(fld.type==="deg" && typeof v==="number") ? v.toFixed(6) : v;
+      c.disabled=false;
+    }); });
   }
-  $("epJump").addEventListener("keydown", function(ev){ if(ev.key==="Enter"){ ev.preventDefault(); doJump(); } });
-  $("epJump").addEventListener("change", doJump);
 
-  epConnect.addEventListener("click", async function(){
-    var S=D().eep.st; if(connected) return;
-    var t=K5.pickTransport(); if(!t){ epSt(D().beacon.st.neither,"err"); return; }
-    epSt(S.connecting);
+  seConnect.addEventListener("click", async function(){
+    var S=D().set.st; if(connected) return;
+    var t=K5.pickTransport(); if(!t){ seSt(D().beacon.st.neither,"err"); return; }
+    seSt(S.connecting);
     try{
       await t.connect(); radio=new K5.Radio(t);
       var ver=await radio.hello();
-      if(!ver){ epSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} radio=null; return; }
-      connected=true; epSt(S.connected(ver),"ok");
-      epConnect.textContent=D().eep.connected; epConnect.classList.add("connected");
-      $("epPanel").style.display="block";
+      if(!ver){ seSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} radio=null; return; }
+      connected=true; seSt(S.connected(ver),"ok");
+      seConnect.textContent=D().set.connected; seConnect.classList.add("connected");
+      $("sePanel").style.display="block";
     }catch(e){
       var m=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(m);
-      epSt(busy?S.portBusy:S.connFail,"err"); try{if(t)await t.disconnect();}catch(_e){} radio=null;
+      seSt(busy?S.portBusy:S.connFail,"err"); try{if(t)await t.disconnect();}catch(_e){} radio=null;
     }
   });
 
-  $("epRead").addEventListener("click", async function(){
-    if(!radio) return; var S=D().eep.st; $("epRead").disabled=true;
+  $("seRead").addEventListener("click", async function(){
+    if(!radio) return; var S=D().set.st; $("seRead").disabled=true;
     try{
-      mem = await radio.dumpEeprom(0,0x2000,function(d,t){ epBar(d,t); epProg(S.reading(d,t)); });
-      dirty=new Set(); render(); $("epWrite").disabled=false; epProg(S.readDone,"ok");
-    }catch(e){ epProg(S.writeFail(e&&e.message?e.message:e),"err"); }
-    $("epRead").disabled=false;
+      mem=await radio.dumpEeprom(0,0x2000,function(d,t){ seBar(d,t); seProg(S.reading(d,t)); });
+      dirty=new Set(); populate(); $("seWrite").disabled=false; seProg(S.readDone,"ok");
+    }catch(e){ seProg(S.writeFail(e&&e.message?e.message:e),"err"); }
+    $("seRead").disabled=false;
   });
 
-  $("epWrite").addEventListener("click", async function(){
-    if(!radio||!mem) return; var S=D().eep.st;
-    if($("epBody").querySelector("input.hx.bad")){ epProg(S.badRows,"err"); return; }
-    var rows=[]; dirty.forEach(function(a){ rows.push(a); }); rows.sort(function(x,y){ return x-y; });
-    if(rows.length===0){ epProg(S.noChanges); return; }
-    var calib=rows.filter(function(a){ return a>=0x1E00; }).length;
-    if(calib>0 && !confirm(S.calibConfirm(calib))) return;
-    $("epWrite").disabled=true;
+  $("seWrite").addEventListener("click", async function(){
+    if(!radio||!mem) return; var S=D().set.st;
+    var pages=[]; dirty.forEach(function(a){ pages.push(a); }); pages.sort(function(x,y){return x-y;});
+    if(pages.length===0){ seProg(S.noChanges); return; }
+    $("seWrite").disabled=true;
     try{
-      for(var i=0;i<rows.length;i++){
-        await radio.writeCfg(rows[i], mem.slice(rows[i], rows[i]+16));
-        epBar(i+1,rows.length); epProg(S.writing(i+1,rows.length));
+      for(var i=0;i<pages.length;i++){
+        await radio.writeCfg(pages[i], mem.slice(pages[i], pages[i]+8));
+        seBar(i+1,pages.length); seProg(S.writing(i+1,pages.length));
       }
-      rows.forEach(function(a){ var inp=$("epBody").querySelector("input[data-a='"+a+"']"); if(inp) inp.classList.remove("dirty"); });
-      dirty=new Set(); epProg(S.writeDone(rows.length),"ok");
-    }catch(e){ epProg(S.writeFail(e&&e.message?e.message:e),"err"); }
-    $("epWrite").disabled=false;
+      dirty=new Set(); seProg(S.writeDone,"ok");
+    }catch(e){ seProg(S.writeFail(e&&e.message?e.message:e),"err"); }
+    $("seWrite").disabled=false;
   });
 
-  onLang(function(){ epConnect.textContent = connected ? D().eep.connected : D().eep.connect; });
+  $("seRestore").addEventListener("click", function(){ if(radio) $("seFile").click(); else seProg(D().set.st.connFail,"err"); });
+  $("seFile").addEventListener("change", async function(){
+    var f=this.files[0]; if(!f||!radio) return; var S=D().set.st;
+    var buf=new Uint8Array(await f.arrayBuffer()); this.value="";
+    if(buf.length<0x1E00){ seProg(S.restoreBad,"err"); return; }
+    if(!confirm(S.restoreConfirm)) return;
+    $("seRestore").disabled=true;
+    try{
+      await radio.restore(buf,0x1E00,function(d,t){ seBar(d,t); seProg(S.restoreWriting(d,t)); });
+      if(mem){ mem.set(buf.slice(0,0x1E00),0); dirty=new Set(); populate(); }
+      seProg(S.restoreDone,"ok");
+    }catch(e){ seProg(S.writeFail(e&&e.message?e.message:e),"err"); }
+    $("seRestore").disabled=false;
+  });
+
+  onLang(function(){
+    seConnect.textContent = connected ? D().set.connected : D().set.connect;
+    buildForm();
+  });
 })();
 
 /* ======================= boot ======================= */
