@@ -54,6 +54,7 @@
 
   <button id="connect" class="big" type="button">Connect Radio</button>
   <p class="status" id="connStatus"></p>
+  <textarea id="rawerr" readonly style="display:none;width:100%;min-height:4.5em;font:400 .78rem/1.4 ui-monospace,Menlo,monospace;color:var(--warn);background:transparent;border:1px solid var(--line);border-radius:6px;padding:.5rem"></textarea>
   <a href="#" id="showall" style="display:none;font-size:.82rem;color:var(--accent)">Show all USB devices</a>
 
   <button id="beacon" class="big" type="button" disabled>Beacon My Location</button>
@@ -184,6 +185,8 @@ function makeWebUsb(showAll) {
         if (e.direction === "out") epOut = e.endpointNumber;
       });
       if (!epOut) throw new Error("no OUT endpoint found on the adapter");
+      // clear any stuck state from a previous session before configuring
+      try { await dev.reset(); } catch (e) {}
       await ch340Init();
     },
     send: async function (bytes) { await dev.transferOut(epOut, bytes); }
@@ -226,7 +229,10 @@ connectBtn.addEventListener("click", async function () {
     if (/No device selected|cancell/i.test(msg))
       setConn("No adapter picked. If the list was empty, tap “Show all USB devices” below.", "err");
     else
-      setConn("Connection failed: " + msg, "err");
+      setConn("Connection failed (full detail below).", "err");
+    var box = document.getElementById("rawerr");
+    box.value = (e && e.name ? e.name + "\n" : "") + msg;
+    box.style.display = "block";
     transport = null;
     showAllLink.style.display = ("usb" in navigator) ? "inline" : "none";
   }
