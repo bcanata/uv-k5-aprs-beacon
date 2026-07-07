@@ -172,7 +172,16 @@ function makeWebUsb(showAll) {
   return {
     name: "WebUSB",
     connect: async function () {
-      dev = await navigator.usb.requestDevice({ filters: filters });
+      // reuse an already-permitted adapter (robust on reconnect); else prompt
+      dev = null;
+      try {
+        var known = await navigator.usb.getDevices();
+        for (var i = 0; i < known.length; i++) {
+          var v = known[i].vendorId;
+          if (showAll || v === 0x1A86 || v === 0x10C4 || v === 0x0403 || v === 0x067B) { dev = known[i]; break; }
+        }
+      } catch (e) {}
+      if (!dev) dev = await navigator.usb.requestDevice({ filters: filters });
       await dev.open();
       if (dev.configuration === null) await dev.selectConfiguration(1);
       var iface = dev.configuration.interfaces[0];
