@@ -188,12 +188,20 @@
     .lcd.on { animation: in 220ms ease-out; }
     @keyframes in { from { opacity: 0; transform: translateY(4px); } }
   }
+  nav.k5nav{display:flex;gap:.5rem;padding:0 0 1rem;margin-bottom:1rem;border-bottom:1px solid var(--line);font:600 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;flex-wrap:wrap;}
+  nav.k5nav a{color:var(--muted);text-decoration:none;padding:.35rem .55rem;border-radius:6px;}
+  nav.k5nav a.active{background:var(--accent);color:var(--accent-ink);}
 </style>
 </head>
 <body>
 
 <div class="wrap">
-  <div class="topbar">
+  <nav class="k5nav">
+    <a href="index.html">Installer</a>
+    <a href="beacon.html">Web Beacon</a>
+    <a href="code.html" class="active">Code Tool</a>
+  </nav>
+    <div class="topbar">
     <div class="eyebrow" id="t-eyebrow">UV-K5 &middot; APRS FIELD TOOL</div>
     <div class="langtoggle" role="group" aria-label="Language">
       <button type="button" data-lang="tr" aria-pressed="false">TR</button>
