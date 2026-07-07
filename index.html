@@ -66,6 +66,14 @@
     <div class="meta" id="meta"></div>
   </section>
 
+  <div style="display:flex;align-items:center;gap:.6rem;border-top:1px solid var(--line);padding-top:1.1rem">
+    <label style="font:600 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Every
+      <input id="ivl" type="number" min="30" max="1800" value="60" style="width:4.5rem;margin-left:.4rem;font:500 1rem ui-monospace,Menlo,monospace;color:var(--ink);background:var(--field-bg);border:1px solid var(--line);border-radius:6px;padding:.4rem .5rem"> s
+    </label>
+  </div>
+  <button id="track" class="big" type="button" disabled style="background:var(--ok);color:#04120a">Start Live Tracking</button>
+  <p class="status" id="trackStatus" role="status"></p>
+
   <p class="fine">Set the radio to <b>144.800 MHz</b>, APRS <b>ON</b>, and configure your callsign first. iOS is not supported (its browsers lack Web Serial/WebUSB). On Android use Chrome + a USB-OTG cable. The radio must be in <b>normal mode</b> (not flash mode). Note: with a plain 3-wire programming cable, TX may be blocked unless the firmware's cable-voltage exception is present.</p>
 </div>
 
@@ -215,6 +223,7 @@ async function tryConnect(makeTransport, preDevice) {
   connectBtn.classList.add("connected");
   connectBtn.textContent = "Radio Connected";
   beaconBtn.disabled = false;
+  document.getElementById("track").disabled = false;
 }
 
 connectBtn.addEventListener("click", async function () {
@@ -246,34 +255,97 @@ showAllLink.addEventListener("click", async function (ev) {
   catch (e) { setConn("Still failed: " + ((e && e.message) ? e.message : e), "err"); }
 });
 
+// send one beacon at a fix; updates the LCD. Returns a promise.
+async function sendFix(pos) {
+  var lat = pos.coords.latitude, lon = pos.coords.longitude;
+  var acc = Math.round(pos.coords.accuracy);
+  await transport.send(cmdBeaconAt(Math.round(lat * 1e6), Math.round(lon * 1e6)));
+  coordsEl.textContent = Math.abs(lat).toFixed(4) + (lat < 0 ? "S" : "N") + "  " +
+                         Math.abs(lon).toFixed(4) + (lon < 0 ? "W" : "E");
+  metaEl.textContent = "±" + acc + " m  ·  sent " + new Date().toLocaleTimeString();
+  fix.classList.add("on");
+}
+
+var geoErr = function (setter) {
+  return function (err) {
+    if (err && err.code === 1) setter("Location permission denied.", "err");
+    else if (err && err.code === 3) setter("GPS timed out. Try again outdoors.", "err");
+    else setter("Could not get location. Is GPS on?", "err");
+  };
+};
+
 beaconBtn.addEventListener("click", function () {
   if (!transport) { setTx("Connect the radio first.", "err"); return; }
   if (!navigator.geolocation) { setTx("This browser has no geolocation.", "err"); return; }
   setTx("Waiting for GPS…");
   beaconBtn.disabled = true;
   navigator.geolocation.getCurrentPosition(async function (pos) {
-    var lat = pos.coords.latitude, lon = pos.coords.longitude;
-    var acc = Math.round(pos.coords.accuracy);
-    var latU = Math.round(lat * 1e6), lonU = Math.round(lon * 1e6);
-    try {
-      await transport.send(cmdBeaconAt(latU, lonU));
-      var la = Math.abs(lat).toFixed(4) + (lat < 0 ? "S" : "N");
-      var lo = Math.abs(lon).toFixed(4) + (lon < 0 ? "W" : "E");
-      coordsEl.textContent = la + "  " + lo;
-      metaEl.textContent = "±" + acc + " m  ·  sent " + new Date().toLocaleTimeString();
-      fix.classList.add("on");
-      setTx("Beacon sent to radio.", "ok");
-    } catch (e) {
-      setTx("Send failed: " + (e && e.message ? e.message : e) + " (still connected?)", "err");
-    }
+    try { await sendFix(pos); setTx("Beacon sent to radio.", "ok"); }
+    catch (e) { setTx("Send failed: " + (e && e.message ? e.message : e) + " (still connected?)", "err"); }
     beaconBtn.disabled = false;
-  }, function (err) {
-    beaconBtn.disabled = false;
-    if (err && err.code === 1) setTx("Location permission denied.", "err");
-    else if (err && err.code === 3) setTx("GPS timed out. Try again outdoors.", "err");
-    else setTx("Could not get location. Is GPS on?", "err");
-  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+  }, function (e) { beaconBtn.disabled = false; geoErr(setTx)(e); },
+     { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
 });
+
+// ---- Live tracking: watch GPS, beacon on an interval, keep screen awake ----
+var trackBtn    = document.getElementById("track");
+var trackStatus = document.getElementById("trackStatus");
+var ivlInput    = document.getElementById("ivl");
+function setTrack(msg, cls) { trackStatus.textContent = msg; trackStatus.className = "status " + (cls || ""); }
+
+var tracking = false, watchId = null, timerId = null, wakeLock = null, lastPos = null, sentCount = 0;
+
+async function acquireWakeLock() {
+  try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+}
+function releaseWakeLock() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
+// re-acquire if the OS dropped it when the tab was briefly hidden
+document.addEventListener("visibilitychange", function () {
+  if (tracking && document.visibilityState === "visible" && !wakeLock) acquireWakeLock();
+});
+
+async function tick() {
+  if (!tracking || !lastPos) return;
+  try {
+    await sendFix(lastPos);
+    sentCount++;
+    setTrack("Tracking — " + sentCount + " sent, last " + new Date().toLocaleTimeString() +
+             ". Keep the screen on.", "ok");
+  } catch (e) {
+    setTrack("Send failed (" + (e && e.message ? e.message : e) + "). Tracking stopped.", "err");
+    stopTracking();
+  }
+}
+
+function startTracking() {
+  if (!transport) { setTrack("Connect the radio first.", "err"); return; }
+  if (!navigator.geolocation) { setTrack("This browser has no geolocation.", "err"); return; }
+  var ivl = Math.max(30, Math.min(1800, parseInt(ivlInput.value, 10) || 60));
+  tracking = true; sentCount = 0; lastPos = null;
+  trackBtn.textContent = "Stop Live Tracking";
+  trackBtn.style.background = "var(--warn)"; trackBtn.style.color = "#fff";
+  beaconBtn.disabled = true; ivlInput.disabled = true;
+  setTrack("Acquiring GPS…");
+  acquireWakeLock();
+  watchId = navigator.geolocation.watchPosition(
+    function (pos) { lastPos = pos; if (sentCount === 0) tick(); },   // first fix -> beacon at once
+    geoErr(setTrack),
+    { enableHighAccuracy: true, timeout: 30000, maximumAge: 15000 });
+  timerId = setInterval(tick, ivl * 1000);
+}
+
+function stopTracking() {
+  tracking = false;
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId), watchId = null;
+  if (timerId !== null) clearInterval(timerId), timerId = null;
+  releaseWakeLock();
+  trackBtn.textContent = "Start Live Tracking";
+  trackBtn.style.background = "var(--ok)"; trackBtn.style.color = "#04120a";
+  ivlInput.disabled = false;
+  beaconBtn.disabled = !transport;
+}
+
+trackBtn.addEventListener("click", function () { tracking ? stopTracking() : startTracking(); });
 
 // auto-reconnect on load to an already-permitted adapter (no gesture needed,
 // so getDevices() here does NOT harm the requestDevice activation later)
