@@ -72,6 +72,10 @@
       background:transparent;border:1px solid var(--line);border-radius:6px;padding:.5rem;display:none;margin-top:.5rem;text-transform:none;}
   a.pill{display:inline-block;margin-top:.6rem;padding:.7rem 1rem;border-radius:6px;background:var(--ok);color:#04120a;
       text-decoration:none;font:700 .85rem/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;}
+  a.skip{display:inline-block;margin-top:.55rem;font:600 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.05em;
+      color:var(--muted);text-decoration:none;border-bottom:1px dashed var(--line);padding-bottom:1px;}
+  a.skip:hover{color:var(--accent);border-color:var(--accent);}
+  a.skip::after{content:" \2192";}
   .fine{color:var(--muted);font-size:.8rem;margin-top:1.5rem;border-top:1px solid var(--line);padding-top:1rem;}
   code{font-family:ui-monospace,Menlo,monospace;}
 
@@ -135,7 +139,7 @@
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </div>
-  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b5</div>
+  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b6</div>
 
   <nav class="tabs">
     <a id="tab-install" href="#install" data-i18n="nav.install">Install</a>
@@ -167,6 +171,7 @@
         <button class="act" id="btnBackup" disabled data-i18n="install.s2.btn"></button>
         <div class="bar" id="barBackup"><i></i></div>
         <p class="status" id="stBackup"></p>
+        <a href="#" class="skip" id="skip2" data-i18n="install.skip"></a>
       </li>
 
       <li class="step" id="s3">
@@ -175,6 +180,7 @@
         <button class="act" id="btnWipe" disabled data-i18n="install.s3.btn"></button>
         <div class="bar" id="barWipe"><i></i></div>
         <p class="status" id="stWipe"></p>
+        <a href="#" class="skip" id="skip3" data-i18n="install.skip"></a>
       </li>
 
       <li class="step" id="s4">
@@ -182,6 +188,7 @@
         <p data-i18n-html="install.s4.p"></p>
         <button class="act" id="btnFlashMode" disabled data-i18n="install.s4.btn"></button>
         <p class="status" id="stFlashMode"></p>
+        <a href="#" class="skip" id="skip4" data-i18n="install.skip"></a>
       </li>
 
       <li class="step" id="s5">
@@ -190,6 +197,7 @@
         <button class="act" id="btnFlash" disabled data-i18n="install.s5.btn"></button>
         <div class="bar" id="barFlash"><i></i></div>
         <p class="status" id="stFlash"></p>
+        <a href="#" class="skip" id="skip5" data-i18n="install.skip"></a>
       </li>
 
       <li class="step" id="s6">
@@ -206,6 +214,7 @@
         <button class="act dark" id="btnGps" data-i18n="install.s6.gps"></button>
         <button class="act" id="btnSave" disabled data-i18n="install.s6.save"></button>
         <p class="status" id="stSave"></p>
+        <a href="#" class="skip" id="skip6" data-i18n="install.skip"></a>
       </li>
 
       <li class="step" id="s7">
@@ -341,7 +350,7 @@
 
 </div>
 
-<script src="k5.js?v=5"></script>
+<script src="k5.js?v=6"></script>
 <script>
 "use strict";
 
@@ -383,10 +392,12 @@ var T = {
       fine: "Open source. Firmware & tools: the UV-K5 APRS edition (TA1JS). On macOS install the WCH CH34x driver if the cable isn't detected. iOS browsers can't access USB — use a desktop, or Android Chrome with a USB-OTG cable (flashing needs a desktop).",
       posPlaceholder: "press Use my GPS",
       on: "On", off: "Off", min: "min",
+      skip: "Skip this step",
       st: {
         selectAdapter: "Select the radio's USB adapter…",
         noSerial: "No USB serial support in this browser.",
         portBusy: "The serial port is already open — close any other browser tab (or app) using the radio, then reload and try again.",
+        skipped: "Skipped.",
         noAnswer: "Connected, but the radio didn't answer. Is it ON (not in flash mode)?",
         connected: function(v){ return "Connected. Radio firmware: " + v; },
         connFailed: "Connection failed.",
@@ -535,10 +546,12 @@ var T = {
       fine: "Açık kaynak. Firmware & araçlar: UV-K5 APRS sürümü (TA1JS). macOS'ta kablo algılanmazsa WCH CH34x sürücüsünü kurun. iOS tarayıcıları USB'ye erişemez — masaüstü ya da USB-OTG kablolu Android Chrome kullanın (yükleme masaüstü gerektirir).",
       posPlaceholder: "GPS'imi Kullan'a bas",
       on: "Açık", off: "Kapalı", min: "dk",
+      skip: "Bu adımı atla",
       st: {
         selectAdapter: "Telsizin USB adaptörünü seç…",
         noSerial: "Bu tarayıcıda USB seri desteği yok.",
         portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeleri (veya uygulamaları) kapatın, sayfayı yenileyip tekrar deneyin.",
+        skipped: "Atlandı.",
         noAnswer: "Bağlandı ama telsiz yanıt vermedi. Açık mı (yükleme modunda değil)?",
         connected: function(v){ return "Bağlandı. Telsiz firmware: " + v; },
         connFailed: "Bağlantı başarısız.",
@@ -734,6 +747,28 @@ window.addEventListener("hashchange", routeFromHash);
 
   activate("s1");
 
+  // ---- skip links: mark a step done and advance without performing its action ----
+  // (Connect is never skippable — backup/wipe/flash/configure all need the link.)
+  function bindSkip(linkId, curId, statusId, nextId, nextBtnId, flashGuard){
+    var el = $(linkId); if (!el) return;
+    el.addEventListener("click", function(ev){
+      ev.preventDefault();
+      if (!$(curId).classList.contains("active")) return;   // only when unlocked
+      var S = D().install.st;
+      stepState(curId, "done"); st(statusId, S.skipped, "");
+      activate(nextId);
+      if (nextBtnId){
+        if (flashGuard && K5.isMobile) st("stFlash", S.flashDesktopOnly, "err");
+        else $(nextBtnId).disabled = false;
+      }
+    });
+  }
+  bindSkip("skip2", "s2", "stBackup",   "s3", "btnWipe");
+  bindSkip("skip3", "s3", "stWipe",     "s4", "btnFlashMode");
+  bindSkip("skip4", "s4", "stFlashMode","s5", "btnFlash", true);
+  bindSkip("skip5", "s5", "stFlash",    "s6", "btnSave");
+  bindSkip("skip6", "s6", "stSave",     "s7", null);
+
   $("btnConnect").addEventListener("click", async function(){
     var S = D().install.st;
     var t = K5.pickTransport();
@@ -745,7 +780,7 @@ window.addEventListener("hashchange", routeFromHash);
       var ver = null;
       for (var attempt = 0; attempt < 3 && !ver; attempt++) ver = await radio.hello();
       if (!ver){
-        // DIAGNOSTIC (build b5): resend hello and dump whatever the radio returns, raw.
+        // DIAGNOSTIC (build b6): resend hello and dump whatever the radio returns, raw.
         // 0 bytes => the reply isn't reaching the browser; N bytes => a parse issue.
         var got = new Uint8Array(0);
         try {
@@ -757,7 +792,7 @@ window.addEventListener("hashchange", routeFromHash);
           }
         } catch(e){}
         var hex = Array.prototype.map.call(got, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
-        $("raw").value = "DIAG build b5 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
+        $("raw").value = "DIAG build b6 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
         $("raw").style.display = "block";
         st("stConnect", S.noAnswer, "err");
         try { await t.disconnect(); } catch(_e){}
