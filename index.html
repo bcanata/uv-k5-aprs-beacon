@@ -154,10 +154,10 @@ function makeWebUsb(showAll) {
   async function ch340Init() {
     try {
       var b = ch341BaudPair(38400);
-      // classic CH340G register set (the one Android already accepts)
       await ctrl("init",   0xA1, 0x0000, 0x0000);  // serial init
       await ctrl("baudHi", 0x9A, 0x1312, b.hi);    // baud divisor/prescaler
-      await ctrl("baudLo", 0x9A, 0x0F2C, b.lo);    // baud low byte  (8N1 default)
+      await ctrl("baudLo", 0x9A, 0x0F2C, b.lo);    // baud low byte
+      await ctrl("lcr",    0x9A, 0x2518, 0x00C3);  // 8N1 + ENABLE RX + ENABLE TX (turns the TX pin on)
       await ctrl("hs",     0xA1, 0x501F, 0xD90A);  // status/handshake
     } catch (e) {
       throw new Error("CH340 setup failed at step '" + step + "': " +
