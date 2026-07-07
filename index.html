@@ -101,6 +101,28 @@
   .rowfields{display:flex;flex-direction:column;gap:.7rem;border-top:1px solid var(--line);padding-top:1.1rem;margin-top:1.1rem;}
   .inlinelbl{font:600 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
   input.tiny{width:4.5rem;margin:0 .4rem;display:inline;}
+
+  /* ---- radio control panel ---- */
+  .rc-lcd{background:var(--lcd-bg);border:1px solid var(--lcd-frame);border-radius:10px;padding:.8rem;display:flex;justify-content:center;margin-top:1rem;}
+  #rcScreen{width:100%;max-width:24rem;image-rendering:pixelated;aspect-ratio:128/64;background:#0d0b05;border-radius:4px;}
+  .rc-state{display:grid;grid-template-columns:repeat(2,1fr);gap:.4rem .8rem;margin:.9rem 0;font:600 .78rem/1.3 ui-monospace,Menlo,monospace;color:var(--muted);}
+  .rc-state b{color:var(--ink);font-weight:700;}
+  .rc-state .tx{color:var(--warn);}
+  .rc-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:1rem;}
+  .rc-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-top:.5rem;}
+  .rc-side{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;margin-top:.5rem;}
+  button.rk{padding:.85rem .3rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);
+      font:700 1rem/1 ui-monospace,Menlo,monospace;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;}
+  button.rk:active{background:var(--accent);color:var(--accent-ink);transform:translateY(1px);}
+  button.rk .sub{display:block;font:600 .52rem/1.2 ui-monospace,Menlo,monospace;color:var(--muted);letter-spacing:.05em;margin-top:.15rem;}
+  button.rk:active .sub{color:var(--accent-ink);}
+  button.rk.wide{grid-column:span 1;}
+  #rcConnect{background:var(--ink);color:var(--bg);}
+  #rcConnect.connected{background:var(--ok);color:#04120a;}
+  #rcPtt{background:var(--warn);color:#fff;touch-action:none;}
+  #rcPtt.tx{background:#d11;box-shadow:0 0 0 3px rgba(209,17,17,.3);}
+  .rc-tx{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-top:1rem;}
+  .rc-tx label{display:flex;flex-direction:column;gap:.3rem;font:600 .64rem/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -113,12 +135,13 @@
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </div>
-  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b4</div>
+  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b5</div>
 
   <nav class="tabs">
     <a id="tab-install" href="#install" data-i18n="nav.install">Install</a>
     <a id="tab-beacon"  href="#beacon"  data-i18n="nav.beacon">Web Beacon</a>
     <a id="tab-code"    href="#code"    data-i18n="nav.code">Codes</a>
+    <a id="tab-control" href="#control" data-i18n="nav.control">Control</a>
   </nav>
 
   <!-- =============================== INSTALL =============================== -->
@@ -268,9 +291,57 @@
     <p class="fine" data-i18n-html="code.fine"></p>
   </section>
 
+  <!-- =============================== RADIO CONTROL =============================== -->
+  <section class="view" id="view-control">
+    <h1 data-i18n="control.h1">Radio Control</h1>
+    <p class="lede" data-i18n="control.lede"></p>
+    <div class="note" data-i18n-html="control.fwnote"></div>
+
+    <button id="rcConnect" class="big" type="button" data-i18n="control.connect"></button>
+    <p class="status" id="rcStatus"></p>
+
+    <div id="rcPanel" style="display:none">
+      <div class="rc-lcd"><canvas id="rcScreen" width="128" height="64"></canvas></div>
+      <div class="rc-state" id="rcState"></div>
+
+      <div class="rc-nav">
+        <button class="rk" data-key="10">MENU</button>
+        <button class="rk" data-key="11">▲<span class="sub" data-i18n="control.up"></span></button>
+        <button class="rk" data-key="12">▼<span class="sub" data-i18n="control.down"></span></button>
+        <button class="rk" data-key="13">EXIT</button>
+      </div>
+      <div class="rc-keys">
+        <button class="rk" data-key="1">1</button>
+        <button class="rk" data-key="2">2</button>
+        <button class="rk" data-key="3">3</button>
+        <button class="rk" data-key="4">4</button>
+        <button class="rk" data-key="5">5</button>
+        <button class="rk" data-key="6">6</button>
+        <button class="rk" data-key="7">7</button>
+        <button class="rk" data-key="8">8</button>
+        <button class="rk" data-key="9">9</button>
+        <button class="rk" data-key="14">✱<span class="sub">SCAN</span></button>
+        <button class="rk" data-key="0">0</button>
+        <button class="rk" data-key="15">#<span class="sub">F</span></button>
+      </div>
+      <div class="rc-side">
+        <button class="rk" data-key="18">SIDE1</button>
+        <button class="rk" data-key="17">SIDE2</button>
+      </div>
+
+      <div class="rc-tx">
+        <label><span data-i18n="control.power"></span><select id="rcPow"></select></label>
+        <label><span data-i18n="control.bw"></span><select id="rcBw"></select></label>
+        <label><span data-i18n="control.mod"></span><select id="rcMod"></select></label>
+      </div>
+      <button id="rcPtt" class="big" type="button" data-i18n="control.ptt"></button>
+      <p class="fine" data-i18n-html="control.fine"></p>
+    </div>
+  </section>
+
 </div>
 
-<script src="k5.js?v=4"></script>
+<script src="k5.js?v=5"></script>
 <script>
 "use strict";
 
@@ -283,7 +354,7 @@ var T = {
   en: {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Edition (TA1JS)" },
-    nav: { install: "Install", beacon: "Web Beacon", code: "Codes" },
+    nav: { install: "Install", beacon: "Web Beacon", code: "Codes", control: "Control" },
     install: {
       h1: "Firmware Installer",
       lede: "Flashes the UV-K5 APRS firmware and configures it entirely in your browser over the programming cable — back up, wipe, flash, and set your callsign & position. Nothing to install.",
@@ -411,13 +482,31 @@ var T = {
       failed: "Could not get location. Is GPS on?",
       noGeo: "This browser does not support geolocation.",
       skipped: "  (unsupported characters skipped)"
+    },
+    control: {
+      h1: "Radio Control",
+      lede: "Drive the radio from your browser — live screen, virtual keypad and TX controls over USB.",
+      fwnote: "<b>Needs TA1JS v1.1+ firmware</b> with radio control (flash it from the Install tab). Older firmware won't answer control commands.",
+      connect: "Connect Radio",
+      connected: "Connected",
+      up: "", down: "",
+      power: "Power", bw: "BW", mod: "Mod",
+      ptt: "PTT — hold to transmit",
+      fine: "The on-screen keys behave exactly like the radio's physical keys (settings save on release). PTT transmits while held — use only on frequencies you are licensed for. The screen refreshes a few times per second.",
+      st: {
+        connecting: "Connecting…",
+        connected: function(v){ return "Connected: " + v; },
+        needFw: "Connected, but this radio didn't answer control commands. Flash TA1JS v1.1+ (Install tab) with radio control.",
+        connFail: "Connection failed.",
+        portBusy: "The serial port is already open — close any other tab using the radio, then retry."
+      }
     }
   },
 
   tr: {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Sürümü (TA1JS)" },
-    nav: { install: "Kurulum", beacon: "Canlı Beacon", code: "Kodlar" },
+    nav: { install: "Kurulum", beacon: "Canlı Beacon", code: "Kodlar", control: "Kontrol" },
     install: {
       h1: "Firmware Kurulumu",
       lede: "UV-K5 APRS firmware'ini tarayıcınızdan programlama kablosuyla yükler ve yapılandırır — yedekle, temizle, yükle, çağrı işareti ve konumunu ayarla. Kurulacak yazılım yok.",
@@ -545,6 +634,24 @@ var T = {
       failed: "Konum alınamadı. GPS açık mı?",
       noGeo: "Bu tarayıcı konum servisini desteklemiyor.",
       skipped: "  (desteklenmeyen karakterler atlandı)"
+    },
+    control: {
+      h1: "Telsiz Kontrolü",
+      lede: "Telsizi tarayıcından yönet — canlı ekran, sanal tuş takımı ve TX kontrolleri USB üzerinden.",
+      fwnote: "<b>TA1JS v1.1+ firmware</b> (telsiz kontrolü içeren) gerekir; önce Kurulum sekmesinden yükleyin. Eski firmware kontrol komutlarına yanıt vermez.",
+      connect: "Telsizi Bağla",
+      connected: "Bağlandı",
+      up: "", down: "",
+      power: "Güç", bw: "BG", mod: "Mod",
+      ptt: "PTT — bas ve konuş",
+      fine: "Ekrandaki tuşlar telsizin gerçek tuşları gibi davranır (ayarlar bırakınca kaydedilir). PTT basılı tutuldukça yayın yapar — yalnızca lisanslı olduğunuz frekanslarda kullanın. Ekran saniyede birkaç kez yenilenir.",
+      st: {
+        connecting: "Bağlanıyor…",
+        connected: function(v){ return "Bağlandı: " + v; },
+        needFw: "Bağlandı ama telsiz kontrol komutlarına yanıt vermedi. Kurulum sekmesinden telsiz kontrollü TA1JS v1.1+ yükleyin.",
+        connFail: "Bağlantı başarısız.",
+        portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeyi kapatıp tekrar deneyin."
+      }
     }
   }
 };
@@ -580,7 +687,7 @@ function applyLang(){
 })();
 
 /* ======================= view routing ======================= */
-var VIEWS = ["install", "beacon", "code"];
+var VIEWS = ["install", "beacon", "code", "control"];
 function showView(name){
   if (VIEWS.indexOf(name) < 0) name = "install";
   for (var i = 0; i < VIEWS.length; i++){
@@ -638,7 +745,7 @@ window.addEventListener("hashchange", routeFromHash);
       var ver = null;
       for (var attempt = 0; attempt < 3 && !ver; attempt++) ver = await radio.hello();
       if (!ver){
-        // DIAGNOSTIC (build b4): resend hello and dump whatever the radio returns, raw.
+        // DIAGNOSTIC (build b5): resend hello and dump whatever the radio returns, raw.
         // 0 bytes => the reply isn't reaching the browser; N bytes => a parse issue.
         var got = new Uint8Array(0);
         try {
@@ -650,7 +757,7 @@ window.addEventListener("hashchange", routeFromHash);
           }
         } catch(e){}
         var hex = Array.prototype.map.call(got, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
-        $("raw").value = "DIAG build b4 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
+        $("raw").value = "DIAG build b5 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
         $("raw").style.display = "block";
         st("stConnect", S.noAnswer, "err");
         try { await t.disconnect(); } catch(_e){}
@@ -1041,6 +1148,129 @@ window.addEventListener("hashchange", routeFromHash);
   }
   metinKodla("cCagri", "cCagriPanel", "cCagriKod", "cCagriMeta");
   metinKodla("cMesaj", "cMesajPanel", "cMesajKod", "cMesajMeta");
+})();
+
+/* ======================= RADIO CONTROL ======================= */
+(function(){
+  var radio = null, running = false, pollTimer = null, connected = false;
+  var canvas = $("rcScreen"), ctx = canvas.getContext("2d");
+  var rcConnect = $("rcConnect");
+  function rcSt(msg, cls){ var e = $("rcStatus"); e.textContent = msg; e.className = "status " + (cls || ""); }
+
+  var POW = ["USER","L1","L2","L3","L4","L5","MID","HIGH"];
+  var MOD = ["FM","AM","USB"];
+
+  function fillSelect(sel, arr){ sel.innerHTML = ""; for (var i = 0; i < arr.length; i++){ var o = document.createElement("option"); o.value = i; o.textContent = arr[i]; sel.appendChild(o); } }
+  fillSelect($("rcPow"), POW);
+  fillSelect($("rcBw"), ["Wide","Narrow"]);
+  fillSelect($("rcMod"), MOD);
+
+  // render the 1024-byte paged framebuffer (8 pages x 128 cols, bit0 = top) to the canvas
+  function renderScreen(buf){
+    var img = ctx.createImageData(128, 64);
+    for (var page = 0; page < 8; page++){
+      for (var col = 0; col < 128; col++){
+        var b = buf[page * 128 + col];
+        for (var bit = 0; bit < 8; bit++){
+          var on = (b >> bit) & 1;
+          var idx = (((page * 8 + bit) * 128) + col) * 4;
+          img.data[idx]     = on ? 255 : 22;
+          img.data[idx + 1] = on ? 176 : 18;
+          img.data[idx + 2] = on ? 32  : 8;
+          img.data[idx + 3] = 255;
+        }
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  function renderState(s){
+    if (!s){ $("rcState").innerHTML = ""; return; }
+    var mhz = (s.rxFreq / 100000).toFixed(4);              // 10 Hz units -> MHz
+    var mod = MOD[s.modulation] || "?";
+    var bw  = s.bandwidth ? "Narrow" : "Wide";
+    var pow = ["USER","LOW1","LOW2","LOW3","LOW4","LOW5","MID","HIGH"][s.power] || "?";
+    $("rcState").innerHTML =
+      "<div>RX <b>" + mhz + "</b> MHz</div>" +
+      "<div>" + (s.isTx ? "<span class='tx'>● TX " + (s.txFreq / 100000).toFixed(4) + "</span>" : "RSSI <b>" + s.rssi + "</b>") + "</div>" +
+      "<div>" + mod + " · " + bw + " · " + pow + "</div>" +
+      "<div>Batt <b>" + (s.batteryMv / 1000).toFixed(2) + "</b> V</div>";
+    if (document.activeElement !== $("rcPow")) $("rcPow").value = s.power;
+    if (document.activeElement !== $("rcBw"))  $("rcBw").value  = s.bandwidth;
+    if (document.activeElement !== $("rcMod")) $("rcMod").value = s.modulation;
+  }
+
+  function loop(){
+    if (!running) return;
+    if (!$("view-control").classList.contains("active")){ pollTimer = setTimeout(loop, 500); return; }
+    (async function(){
+      try {
+        var buf = await radio.pollScreen(1200);
+        if (buf) renderScreen(buf);
+        var s = await radio.getState();
+        if (s) renderState(s);
+      } catch(e){}
+      if (running) pollTimer = setTimeout(loop, 280);
+    })();
+  }
+
+  // key buttons: pointer down = press, >600ms = held, up/leave = release
+  function bindKey(btn){
+    var code = parseInt(btn.dataset.key, 10), holdT = null, down = false;
+    function press(e){ if (e) e.preventDefault(); if (down || !radio) return; down = true;
+      radio.injectKey(code, 1);
+      holdT = setTimeout(function(){ if (down && radio) radio.injectKey(code, 3); }, 600);
+    }
+    function release(){ if (!down) return; down = false; clearTimeout(holdT); if (radio) radio.injectKey(code, 0); }
+    btn.addEventListener("pointerdown", press);
+    btn.addEventListener("pointerup", release);
+    btn.addEventListener("pointerleave", release);
+    btn.addEventListener("pointercancel", release);
+    btn.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+  }
+  var keys = document.querySelectorAll("#view-control button.rk");
+  for (var i = 0; i < keys.length; i++) bindKey(keys[i]);
+
+  // PTT: transmit only while held
+  var ptt = $("rcPtt");
+  ptt.addEventListener("pointerdown", function(e){ e.preventDefault(); if (!radio) return; ptt.classList.add("tx"); radio.injectKey(16, 1); });
+  function pttUp(){ if (!radio) return; ptt.classList.remove("tx"); radio.injectKey(16, 0); }
+  ptt.addEventListener("pointerup", pttUp);
+  ptt.addEventListener("pointerleave", pttUp);
+  ptt.addEventListener("pointercancel", pttUp);
+
+  $("rcPow").addEventListener("change", function(){ if (radio) radio.setPower(parseInt(this.value, 10)); });
+  $("rcBw").addEventListener("change",  function(){ if (radio) radio.setBandwidth(parseInt(this.value, 10)); });
+  $("rcMod").addEventListener("change", function(){ if (radio) radio.setModulation(parseInt(this.value, 10)); });
+
+  onLang(function(){ rcConnect.textContent = connected ? D().control.connected : D().control.connect; });
+
+  rcConnect.addEventListener("click", async function(){
+    var S = D().control.st;
+    if (connected){ return; }
+    var t = K5.pickTransport();
+    if (!t){ rcSt(D().beacon.st.neither, "err"); return; }
+    rcSt(S.connecting);
+    try {
+      await t.connect();
+      radio = new K5.Radio(t);
+      var ver = await radio.hello();
+      var s = ver ? await radio.getState() : null;
+      if (!s){ rcSt(S.needFw, "err"); try { await t.disconnect(); } catch(e){} radio = null; return; }
+      connected = true;
+      rcSt(S.connected(ver), "ok");
+      rcConnect.textContent = D().control.connected; rcConnect.classList.add("connected");
+      $("rcPanel").style.display = "block";
+      renderState(s);
+      running = true; loop();
+    } catch(e){
+      var m = (e && e.message) ? e.message : String(e);
+      var busy = /open|in use|already|network/i.test(m);
+      rcSt(busy ? S.portBusy : S.connFail, "err");
+      try { if (t) await t.disconnect(); } catch(_e){}
+      radio = null;
+    }
+  });
 })();
 
 /* ======================= boot ======================= */

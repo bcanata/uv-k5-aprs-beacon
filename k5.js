@@ -237,6 +237,109 @@ var K5 = (function () {
     await this.t.send(frameCommand(0x05DD, new Uint8Array(0)));  // no reply
   };
 
+  // Serialize all radio operations on the single serial link so a screen poll
+  // and a key-press can never interleave their bytes. Every RC method funnels
+  // through _run(); failures don't break the chain.
+  Radio.prototype._run = function (fn) {
+    var next = (this._q || Promise.resolve()).then(fn, fn);
+    // keep the chain alive even if fn rejects
+    this._q = next.catch(function () {});
+    return next;
+  };
+
+  // write a full EEPROM image back, 128 bytes at a time, up to `end` (default
+  // 0x1E00 so calibration 0x1E00+ is never touched). bytes.length must cover [0,end).
+  Radio.prototype.restore = function (bytes, end, onProgress) {
+    var self = this; end = end || 0x1E00;
+    return this._run(async function () {
+      for (var a = 0; a < end; a += 128) {
+        var n = Math.min(128, end - a);
+        if (n % 8 !== 0) n -= (n % 8);
+        await self.writeCfg(a, bytes.slice(a, a + n));
+        if (onProgress) onProgress(a + n, end);
+      }
+      return true;
+    });
+  };
+
+  // --- radio remote control (firmware built with ENABLE_UART_RC) ---
+  // KEY_Code_t values (match driver/keyboard.h): 0-9 digits, 10 MENU, 11 UP,
+  // 12 DOWN, 13 EXIT, 14 STAR(*), 15 F(#), 16 PTT, 17 SIDE2, 18 SIDE1.
+  Radio.prototype.injectKey = function (key, flags) {
+    var self = this;
+    return this._run(async function () {
+      var p = await self._exchange(frameCommand(0x0B01, new Uint8Array([key & 0xFF, flags & 0xFF])), 1200);
+      return !!p && (p[0] | (p[1] << 8)) === 0x0B81 && p[6] === 1;
+    });
+  };
+  // tap = press then release; held=true sends a long-press first
+  Radio.prototype.tapKey = function (key, held) {
+    var self = this;
+    return this._run(async function () {
+      await self._exchange(frameCommand(0x0B01, new Uint8Array([key & 0xFF, held ? 0x03 : 0x01])), 1200);
+      await self._exchange(frameCommand(0x0B01, new Uint8Array([key & 0xFF, 0x00])), 1200);
+      return true;
+    });
+  };
+  Radio.prototype.getState = function () {
+    var self = this;
+    return this._run(async function () {
+      var p = await self._exchange(frameCommand(0x0B02, new Uint8Array(0)), 1200);
+      if (!p || (p[0] | (p[1] << 8)) !== 0x0B82) return null;
+      var dv = new DataView(p.buffer, p.byteOffset, p.length);
+      return {
+        txVfo:      p[4],
+        screen:     p[5],
+        func:       p[6],
+        isTx:       p[7] === 1,
+        rxFreq:     dv.getUint32(8, true),   // 10 Hz units
+        txFreq:     dv.getUint32(12, true),
+        modulation: p[16],                   // 0 FM, 1 AM, 2 USB
+        bandwidth:  p[17],                   // 0 wide, 1 narrow
+        power:      p[18],                   // OUTPUT_POWER_*
+        channel:    p[19],
+        squelch:    p[20],
+        rssi:       dv.getUint16(22, true),
+        batteryMv:  dv.getUint16(24, true)
+      };
+    });
+  };
+  function rcSet(id) {
+    return function (value) {
+      var self = this;
+      return self._run(async function () {
+        var p = await self._exchange(frameCommand(id, new Uint8Array([value & 0xFF])), 1200);
+        return !!p && (p[0] | (p[1] << 8)) === 0x0B81 && p[6] === 1;
+      });
+    };
+  }
+  Radio.prototype.setPower      = rcSet(0x0B03);
+  Radio.prototype.setBandwidth  = rcSet(0x0B04);
+  Radio.prototype.setModulation = rcSet(0x0B05);
+
+  // poll one display frame: send 0x0A03, read the raw push 0xAB 0xED + 1024
+  // bytes (paged 128x64 framebuffer; NOT the AB CD/CRC envelope). Returns the
+  // 1024-byte buffer or null.
+  Radio.prototype.pollScreen = function (timeoutMs) {
+    var self = this;
+    return this._run(async function () {
+      self.rx = new Uint8Array(0);
+      await self.t.send(frameCommand(0x0A03, new Uint8Array(0)));
+      var deadline = Date.now() + (timeoutMs || 1500);
+      for (;;) {
+        for (var i = 0; i + 1 < self.rx.length; i++) {
+          if (self.rx[i] === 0xAB && self.rx[i + 1] === 0xED) {
+            if (self.rx.length >= i + 2 + 1024) return self.rx.slice(i + 2, i + 2 + 1024);
+            break;
+          }
+        }
+        if (Date.now() >= deadline) return null;
+        var chunk = await self.t.recv(1200, Math.min(400, deadline - Date.now()));
+        if (chunk && chunk.length) self.rx = concat(self.rx, chunk);
+      }
+    });
+  };
+
   // read a whole EEPROM range into one Uint8Array (default 0x0000..0x2000)
   Radio.prototype.dumpEeprom = async function (start, end, onProgress) {
     start = start || 0; end = end || 0x2000;
