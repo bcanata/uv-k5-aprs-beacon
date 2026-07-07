@@ -62,8 +62,12 @@ var K5 = (function () {
       if (buf[s + total - 2] !== 0xDC || buf[s + total - 1] !== 0xBA) continue;
       var dec = xorApply(buf.slice(s + 4, s + 4 + len + 2));
       var payload = dec.slice(0, len);
-      var crc = dec[len] | (dec[len + 1] << 8);
-      if (crc16(payload) !== crc) continue;         // bad frame, keep scanning
+      // Do NOT validate the CRC on RX: the radio's replies carry a placeholder
+      // CRC (0xFFFF), not a real CRC-16 over the payload, so a strict check
+      // rejects every valid reply. The AB CD / DC BA framing + length field are
+      // the integrity signals here (matches aprs_pc.py and joaquimorg's
+      // uv-kx-tools, which also ignore the reply CRC). We still emit a correct
+      // CRC on TX in frameRaw(), which the radio accepts.
       return { payload: payload, rest: buf.slice(s + total) };
     }
     return null;

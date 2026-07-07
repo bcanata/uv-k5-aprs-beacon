@@ -113,7 +113,7 @@
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </div>
-  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b3</div>
+  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b4</div>
 
   <nav class="tabs">
     <a id="tab-install" href="#install" data-i18n="nav.install">Install</a>
@@ -270,7 +270,7 @@
 
 </div>
 
-<script src="k5.js?v=3"></script>
+<script src="k5.js?v=4"></script>
 <script>
 "use strict";
 
@@ -315,6 +315,7 @@ var T = {
       st: {
         selectAdapter: "Select the radio's USB adapter…",
         noSerial: "No USB serial support in this browser.",
+        portBusy: "The serial port is already open — close any other browser tab (or app) using the radio, then reload and try again.",
         noAnswer: "Connected, but the radio didn't answer. Is it ON (not in flash mode)?",
         connected: function(v){ return "Connected. Radio firmware: " + v; },
         connFailed: "Connection failed.",
@@ -448,6 +449,7 @@ var T = {
       st: {
         selectAdapter: "Telsizin USB adaptörünü seç…",
         noSerial: "Bu tarayıcıda USB seri desteği yok.",
+        portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeleri (veya uygulamaları) kapatın, sayfayı yenileyip tekrar deneyin.",
         noAnswer: "Bağlandı ama telsiz yanıt vermedi. Açık mı (yükleme modunda değil)?",
         connected: function(v){ return "Bağlandı. Telsiz firmware: " + v; },
         connFailed: "Bağlantı başarısız.",
@@ -636,8 +638,8 @@ window.addEventListener("hashchange", routeFromHash);
       var ver = null;
       for (var attempt = 0; attempt < 3 && !ver; attempt++) ver = await radio.hello();
       if (!ver){
-        // DIAGNOSTIC (build b3): resend hello and dump whatever the radio returns, raw.
-        // 0 bytes => the reply isn't reaching the browser; N bytes => a parse/timing issue.
+        // DIAGNOSTIC (build b4): resend hello and dump whatever the radio returns, raw.
+        // 0 bytes => the reply isn't reaching the browser; N bytes => a parse issue.
         var got = new Uint8Array(0);
         try {
           await t.send(K5.frameCommand(0x0514, new Uint8Array(K5.TS)));
@@ -648,17 +650,22 @@ window.addEventListener("hashchange", routeFromHash);
           }
         } catch(e){}
         var hex = Array.prototype.map.call(got, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
-        $("raw").value = "DIAG build b3 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
+        $("raw").value = "DIAG build b4 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
         $("raw").style.display = "block";
         st("stConnect", S.noAnswer, "err");
+        try { await t.disconnect(); } catch(_e){}
+        radio = null;
         return;
       }
       st("stConnect", S.connected(ver), "ok");
       stepState("s1","done"); activate("s2"); $("btnBackup").disabled = false;
     } catch(e){
       var m = (e && e.message) ? e.message : String(e);
-      st("stConnect", S.connFailed, "err");
+      var busy = /open|in use|already|network/i.test(m);
+      st("stConnect", busy ? S.portBusy : S.connFailed, "err");
       if (!/No device selected|cancel/i.test(m)){ $("raw").value = (e && e.name ? e.name + "\n" : "") + m; $("raw").style.display = "block"; }
+      try { if (t) await t.disconnect(); } catch(_e){}
+      radio = null;
     }
   });
 
