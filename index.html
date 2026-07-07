@@ -124,6 +124,30 @@
   #rcConnect,#chConnect,#seConnect{background:var(--ink);color:var(--bg);}
   #rcConnect.connected,#chConnect.connected,#seConnect.connected{background:var(--ok);color:#04120a;}
   .selabel{}
+
+  /* ---- APRS monitor + chat ---- */
+  .chat{border:1px solid var(--line);border-radius:8px;background:var(--card);height:38vh;overflow-y:auto;
+        padding:.8rem;display:flex;flex-direction:column;gap:.45rem;margin-top:.8rem;}
+  .bub{max-width:82%;padding:.45rem .7rem;border-radius:11px;font-size:.86rem;line-height:1.35;word-break:break-word;}
+  .bub .who{display:block;font:600 .58rem/1 ui-monospace,Menlo,monospace;letter-spacing:.04em;opacity:.7;margin-bottom:.2rem;}
+  .bub .tm{display:block;font:400 .55rem/1 ui-monospace,Menlo,monospace;opacity:.5;margin-top:.25rem;text-align:right;}
+  .bub.in{align-self:flex-start;background:var(--field-bg);border:1px solid var(--line);}
+  .bub.out{align-self:flex-end;background:var(--accent);color:var(--accent-ink);}
+  .chat .empty{margin:auto;color:var(--muted);font-size:.85rem;}
+  .compose{display:flex;gap:.5rem;margin-top:.7rem;flex-wrap:wrap;}
+  .compose input{font:500 .95rem ui-monospace,Menlo,monospace;color:var(--ink);background:var(--field-bg);border:1px solid var(--line);border-radius:6px;padding:.5rem .6rem;}
+  .compose input#amTo{flex:0 0 7rem;text-transform:uppercase;}
+  .compose input#amText{flex:1;min-width:9rem;text-transform:none;}
+  .compose button.act{margin-top:0;flex:0 0 auto;}
+  .loglist{border:1px solid var(--line);border-radius:8px;max-height:40vh;overflow-y:auto;margin-top:.8rem;
+           font:500 .78rem/1.4 ui-monospace,Menlo,monospace;}
+  .loglist .row{padding:.4rem .6rem;border-bottom:1px solid var(--line);display:flex;gap:.6rem;}
+  .loglist .row .tm{color:var(--muted);flex:0 0 auto;font-size:.68rem;}
+  .loglist .row .tx{word-break:break-word;}
+  .loglist .empty{padding:.9rem;color:var(--muted);}
+  .clearlink{display:inline-block;margin-top:.55rem;font:600 .68rem/1 ui-monospace,Menlo,monospace;letter-spacing:.04em;
+             color:var(--muted);background:none;border:0;cursor:pointer;text-decoration:underline;}
+  .clearlink:hover{color:var(--warn);}
   #rcConnect.connected{background:var(--ok);color:#04120a;}
   #rcPtt{background:var(--warn);color:#fff;touch-action:none;}
   #rcPtt.tx{background:#d11;box-shadow:0 0 0 3px rgba(209,17,17,.3);}
@@ -180,7 +204,7 @@
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </div>
-  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b9</div>
+  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b10</div>
 
   <nav class="tabs">
     <a id="tab-install" href="#install" data-i18n="nav.install">Install</a>
@@ -189,6 +213,7 @@
     <a id="tab-control" href="#control" data-i18n="nav.control">Control</a>
     <a id="tab-channels" href="#channels" data-i18n="nav.channels">Channels</a>
     <a id="tab-settings" href="#settings" data-i18n="nav.settings">Settings</a>
+    <a id="tab-aprs" href="#aprs" data-i18n="nav.aprs">APRS</a>
   </nav>
 
   <!-- =============================== INSTALL =============================== -->
@@ -443,6 +468,29 @@
     </div>
   </section>
 
+  <!-- =============================== APRS =============================== -->
+  <section class="view" id="view-aprs">
+    <h1 data-i18n="ap.h1">APRS</h1>
+    <p class="lede" data-i18n="ap.lede"></p>
+
+    <button id="apConnect" class="big" type="button" data-i18n="ap.connect"></button>
+    <p class="status" id="apStatus"></p>
+
+    <h2 class="sec" data-i18n="ap.chatTitle">Messages</h2>
+    <div class="chat" id="apChat"></div>
+    <div class="compose">
+      <input id="amTo" maxlength="9" autocomplete="off" spellcheck="false">
+      <input id="amText" maxlength="30" autocomplete="off">
+      <button class="act" id="amSend" data-i18n="ap.send"></button>
+    </div>
+    <button class="clearlink" id="apChatClear" data-i18n="ap.clearChat"></button>
+
+    <h2 class="sec" data-i18n="ap.logTitle">Received packets</h2>
+    <div class="loglist" id="apLog"></div>
+    <button class="clearlink" id="apLogClear" data-i18n="ap.clearLog"></button>
+    <p class="fine" data-i18n-html="ap.fine"></p>
+  </section>
+
   <!-- channel edit modal -->
   <div class="modal" id="chModal">
     <div class="box">
@@ -487,6 +535,28 @@ var T = {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Edition (TA1JS)" },
     nav: { install: "Install", beacon: "Web Beacon", code: "Codes", control: "Control", channels: "Channels", settings: "Settings" },
+    ap: {
+      h1: "APRS",
+      lede: "Live APRS monitor and messaging over USB. Keep the radio on 144.800 MHz with menu APRS = ON.",
+      connect: "Connect Radio", connected: "Connected — monitoring",
+      chatTitle: "Messages", logTitle: "Received packets",
+      send: "Send", clearChat: "Clear chat", clearLog: "Clear log",
+      msgPh: "Message (max 30)", toPh: "TA1XYZ-7",
+      emptyLog: "No packets yet — decoded APRS packets the radio reports will appear here.",
+      emptyChat: "No messages yet. Incoming messages to your callsign show here.",
+      confirmClear: "Clear all of these? This can't be undone.",
+      fine: "Everything is stored in this browser (not the radio) and persists between visits. The log captures every decoded packet the radio reports; the chat shows messages addressed to your callsign and the ones you send. Requires the radio on 144.800 MHz with APRS RX on.",
+      st: {
+        connecting: "Connecting…",
+        connected: function(v){ return "Connected: " + v + " — monitoring"; },
+        connFail: "Connection failed.",
+        portBusy: "The serial port is already open — close any other tab using the radio, then retry.",
+        needTo: "Enter a destination callsign first.",
+        needText: "Type a message first.",
+        sent: "Message sent.",
+        sendFail: function(e){ return "Send failed: " + e; }
+      }
+    },
     set: {
       h1: "Settings",
       lede: "Read every setting from the radio, change any of them, and write them back over USB.",
@@ -715,6 +785,28 @@ var T = {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Sürümü (TA1JS)" },
     nav: { install: "Kurulum", beacon: "Canlı Beacon", code: "Kodlar", control: "Kontrol", channels: "Kanallar", settings: "Ayarlar" },
+    ap: {
+      h1: "APRS",
+      lede: "USB üzerinden canlı APRS izleme ve mesajlaşma. Telsizi 144.800 MHz'de, menüde APRS = ON tutun.",
+      connect: "Telsizi Bağla", connected: "Bağlandı — izleniyor",
+      chatTitle: "Mesajlar", logTitle: "Alınan paketler",
+      send: "Gönder", clearChat: "Sohbeti temizle", clearLog: "Kaydı temizle",
+      msgPh: "Mesaj (en çok 30)", toPh: "TA1XYZ-7",
+      emptyLog: "Henüz paket yok — telsizin çözdüğü APRS paketleri burada görünür.",
+      emptyChat: "Henüz mesaj yok. Çağrı işaretinize gelen mesajlar burada görünür.",
+      confirmClear: "Hepsi silinsin mi? Bu geri alınamaz.",
+      fine: "Her şey bu tarayıcıda saklanır (telsizde değil) ve ziyaretler arasında kalır. Kayıt, telsizin çözdüğü her paketi tutar; sohbet, çağrı işaretinize gelen ve gönderdiğiniz mesajları gösterir. Telsizin 144.800 MHz'de ve APRS RX açık olması gerekir.",
+      st: {
+        connecting: "Bağlanıyor…",
+        connected: function(v){ return "Bağlandı: " + v + " — izleniyor"; },
+        connFail: "Bağlantı başarısız.",
+        portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeyi kapatıp tekrar deneyin.",
+        needTo: "Önce hedef çağrı işareti gir.",
+        needText: "Önce bir mesaj yaz.",
+        sent: "Mesaj gönderildi.",
+        sendFail: function(e){ return "Gönderim başarısız: " + e; }
+      }
+    },
     set: {
       h1: "Ayarlar",
       lede: "Telsizdeki her ayarı oku, dilediğini değiştir ve USB üzerinden geri yaz.",
@@ -967,7 +1059,7 @@ function applyLang(){
 })();
 
 /* ======================= view routing ======================= */
-var VIEWS = ["install", "beacon", "code", "control", "channels", "settings"];
+var VIEWS = ["install", "beacon", "code", "control", "channels", "settings", "aprs"];
 function showView(name){
   if (VIEWS.indexOf(name) < 0) name = "install";
   for (var i = 0; i < VIEWS.length; i++){
@@ -1047,7 +1139,7 @@ window.addEventListener("hashchange", routeFromHash);
       var ver = null;
       for (var attempt = 0; attempt < 3 && !ver; attempt++) ver = await radio.hello();
       if (!ver){
-        // DIAGNOSTIC (build b9): resend hello and dump whatever the radio returns, raw.
+        // DIAGNOSTIC (build b10): resend hello and dump whatever the radio returns, raw.
         // 0 bytes => the reply isn't reaching the browser; N bytes => a parse issue.
         var got = new Uint8Array(0);
         try {
@@ -1059,7 +1151,7 @@ window.addEventListener("hashchange", routeFromHash);
           }
         } catch(e){}
         var hex = Array.prototype.map.call(got, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
-        $("raw").value = "DIAG build b9 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
+        $("raw").value = "DIAG build b10 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
         $("raw").style.display = "block";
         st("stConnect", S.noAnswer, "err");
         try { await t.disconnect(); } catch(_e){}
@@ -1883,6 +1975,119 @@ window.addEventListener("hashchange", routeFromHash);
     seConnect.textContent = connected ? D().set.connected : D().set.connect;
     buildForm();
   });
+})();
+
+/* ======================= APRS MONITOR + CHAT ======================= */
+(function(){
+  var t=null, radio=null, connected=false, running=false, rxbuf="";
+  var LOG_KEY="k5_aprs_log", CHAT_KEY="k5_aprs_chat", TO_KEY="k5_aprs_to";
+  function load(k,d){ try{ var v=JSON.parse(localStorage.getItem(k)); return v||d; }catch(e){ return d; } }
+  function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+  var logArr=load(LOG_KEY,[]), chatArr=load(CHAT_KEY,[]);
+  function apSt(m,c){ var e=$("apStatus"); e.textContent=m; e.className="status "+(c||""); }
+  function tm(ts){ var d=new Date(ts); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }
+  function esc(s){ return (s||"").replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
+
+  function renderLog(){
+    var el=$("apLog"); if(!el) return;
+    if(!logArr.length){ el.innerHTML="<div class='empty'>"+esc(D().ap.emptyLog)+"</div>"; return; }
+    var h="";
+    for(var i=logArr.length-1;i>=0;i--) h+="<div class='row'><span class='tm'>"+tm(logArr[i].t)+"</span><span class='tx'>"+esc(logArr[i].text)+"</span></div>";
+    el.innerHTML=h;
+  }
+  function renderChat(){
+    var el=$("apChat"); if(!el) return;
+    if(!chatArr.length){ el.innerHTML="<div class='empty'>"+esc(D().ap.emptyChat)+"</div>"; return; }
+    var h="";
+    chatArr.forEach(function(m){
+      h+="<div class='bub "+(m.dir==="out"?"out":"in")+"'><span class='who'>"+esc(m.dir==="out"?("→ "+m.who):m.who)+"</span>"+esc(m.text)+"<span class='tm'>"+tm(m.t)+"</span></div>";
+    });
+    el.innerHTML=h; el.scrollTop=el.scrollHeight;
+  }
+  function addLog(text){ logArr.push({t:Date.now(),text:text}); if(logArr.length>500)logArr=logArr.slice(-500); save(LOG_KEY,logArr); renderLog(); }
+  function addChat(dir,who,text){ chatArr.push({dir:dir,who:who,text:text,t:Date.now()}); if(chatArr.length>500)chatArr=chatArr.slice(-500); save(CHAT_KEY,chatArr); renderChat(); }
+
+  // a decoded packet line the firmware reported (without the "APRS:" prefix).
+  // Messages addressed to us come through as "CALL>text"; everything else is a
+  // position/telemetry summary -> log only.
+  function onLine(line){
+    addLog(line);
+    var gt=line.indexOf(">");
+    if(gt>0){
+      var from=line.slice(0,gt);
+      if(/^[A-Z0-9]{1,6}(-[0-9]{1,2})?$/.test(from)) addChat("in",from,line.slice(gt+1));
+    }
+  }
+  function extract(){
+    for(;;){
+      var idx=rxbuf.indexOf("APRS:");
+      if(idx<0){ if(rxbuf.length>512) rxbuf=rxbuf.slice(-64); return; }
+      if(idx>0) rxbuf=rxbuf.slice(idx);              // drop binary junk before the prefix
+      var m=rxbuf.search(/[\r\n]/);
+      if(m<0){ if(rxbuf.length>2048) rxbuf=""; return; }  // line incomplete, wait for more
+      var line=rxbuf.slice(5,m).trim();
+      rxbuf=rxbuf.slice(m+1);
+      if(line) onLine(line);
+    }
+  }
+  async function monLoop(){
+    while(running){
+      var chunk;
+      try{ chunk=await t.recv(256,800); }catch(e){ break; }
+      if(chunk&&chunk.length){ for(var i=0;i<chunk.length;i++) rxbuf+=String.fromCharCode(chunk[i]); extract(); }
+    }
+  }
+
+  $("apConnect").addEventListener("click", async function(){
+    var S=D().ap.st; if(connected) return;
+    t=K5.pickTransport(); if(!t){ apSt(D().beacon.st.neither,"err"); return; }
+    apSt(S.connecting);
+    try{
+      await t.connect(); radio=new K5.Radio(t);
+      var ver=await radio.hello();
+      if(!ver){ apSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} t=null; return; }
+      connected=true; apSt(S.connected(ver),"ok");
+      $("apConnect").textContent=D().ap.connected; $("apConnect").classList.add("connected");
+      running=true; monLoop();
+    }catch(e){
+      var msg=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(msg);
+      apSt(busy?S.portBusy:S.connFail,"err"); try{if(t)await t.disconnect();}catch(_e){} t=null;
+    }
+  });
+
+  function msgFrame(dest,text){
+    var d=new Uint8Array(40);
+    dest=(dest||"").toUpperCase();
+    for(var i=0;i<10&&i<dest.length;i++) d[i]=dest.charCodeAt(i)&0x7F;
+    for(var j=0;j<30&&j<text.length;j++) d[10+j]=text.charCodeAt(j)&0x7F;
+    return K5.frameCommand(0x0700,d);
+  }
+  async function doSend(){
+    var S=D().ap.st;
+    var to=$("amTo").value.trim().toUpperCase(), text=$("amText").value;
+    if(!to){ apSt(S.needTo,"err"); return; }
+    if(!text.trim()){ apSt(S.needText,"err"); return; }
+    if(!t||!connected){ apSt(S.connFail,"err"); return; }
+    try{
+      await t.send(msgFrame(to,text));
+      addChat("out",to,text); save(TO_KEY,to);
+      $("amText").value=""; apSt(S.sent,"ok");
+    }catch(e){ apSt(S.sendFail(e&&e.message?e.message:e),"err"); }
+  }
+  $("amSend").addEventListener("click", doSend);
+  $("amText").addEventListener("keydown", function(ev){ if(ev.key==="Enter"){ ev.preventDefault(); doSend(); } });
+  $("apChatClear").addEventListener("click", function(){ if(chatArr.length && confirm(D().ap.confirmClear)){ chatArr=[]; save(CHAT_KEY,chatArr); renderChat(); } });
+  $("apLogClear").addEventListener("click", function(){ if(logArr.length && confirm(D().ap.confirmClear)){ logArr=[]; save(LOG_KEY,logArr); renderLog(); } });
+
+  var lastTo=load(TO_KEY,null); if(lastTo && typeof lastTo==="string") $("amTo").value=lastTo;
+
+  onLang(function(){
+    $("apConnect").textContent = connected ? D().ap.connected : D().ap.connect;
+    $("amText").placeholder = D().ap.msgPh;
+    $("amTo").placeholder = D().ap.toPh;
+    renderLog(); renderChat();
+  });
+  renderLog(); renderChat();
 })();
 
 /* ======================= boot ======================= */
