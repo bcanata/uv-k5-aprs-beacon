@@ -83,7 +83,8 @@ var K5 = (function () {
 
   // ---- transports: each exposes connect(preDevice), send(bytes), recv(max,timeoutMs), name ----
   function makeWebSerial() {
-    var port = null, reader = null, writer = null;
+    var port = null, reader = null, writer = null, pending = null;
+    var TIMED_OUT = {};
     return {
       name: "Web Serial",
       isSerial: true,
@@ -92,12 +93,21 @@ var K5 = (function () {
         await port.open({ baudRate: 38400 });
         writer = port.writable.getWriter();
         reader = port.readable.getReader();
+        pending = null;
       },
       send: async function (bytes) { await writer.write(bytes); },
+      // Keep ONE outstanding read() across calls. Web Streams deliver each
+      // chunk to the oldest pending read(); if the timeout won the race and we
+      // let read() go, the radio's reply would resolve that orphaned promise
+      // and be lost (that was the "connected but no answer" bug). So on
+      // timeout we return empty but preserve `pending` for the next recv.
       recv: async function (max, timeoutMs) {
-        var timer, to = new Promise(function (r) { timer = setTimeout(function () { r(null); }, timeoutMs); });
+        if (!pending) pending = reader.read();
+        var timer, to = new Promise(function (r) { timer = setTimeout(function () { r(TIMED_OUT); }, timeoutMs); });
         try {
-          var res = await Promise.race([reader.read(), to]);
+          var res = await Promise.race([pending, to]);
+          if (res === TIMED_OUT) return new Uint8Array(0);   // keep `pending`
+          pending = null;
           if (!res || res.done || !res.value) return new Uint8Array(0);
           return res.value;
         } finally { clearTimeout(timer); }
@@ -106,12 +116,14 @@ var K5 = (function () {
         try { if (reader) { await reader.cancel(); reader.releaseLock(); } } catch (e) {}
         try { if (writer) writer.releaseLock(); } catch (e) {}
         try { if (port) await port.close(); } catch (e) {}
+        pending = null;
       }
     };
   }
 
   function makeWebUsb(showAll) {
-    var dev = null, epOut = 0, epIn = 0, step = "";
+    var dev = null, epOut = 0, epIn = 0, step = "", pendingIn = null;
+    var TIMED_OUT = {};
     async function ctrl(tag, req, val, idx) {
       step = tag;
       var r = await dev.controlTransferOut(
@@ -148,16 +160,21 @@ var K5 = (function () {
         await ch340Init();
       },
       send: async function (bytes) { await dev.transferOut(epOut, bytes); },
+      // Same rule as Web Serial: never orphan a pending transferIn on timeout,
+      // or the reply bytes it later receives are lost. Preserve it for reuse.
       recv: async function (max, timeoutMs) {
-        var timer, to = new Promise(function (r) { timer = setTimeout(function () { r(null); }, timeoutMs); });
+        if (!pendingIn) pendingIn = dev.transferIn(epIn, max || 64);
+        var timer, to = new Promise(function (r) { timer = setTimeout(function () { r(TIMED_OUT); }, timeoutMs); });
         try {
-          var res = await Promise.race([dev.transferIn(epIn, max || 64), to]);
+          var res = await Promise.race([pendingIn, to]);
+          if (res === TIMED_OUT) return new Uint8Array(0);   // keep `pendingIn`
+          pendingIn = null;
           if (!res || !res.data || !res.data.byteLength) return new Uint8Array(0);
           return new Uint8Array(res.data.buffer, res.data.byteOffset, res.data.byteLength);
-        } catch (e) { return new Uint8Array(0); }
+        } catch (e) { pendingIn = null; return new Uint8Array(0); }
         finally { clearTimeout(timer); }
       },
-      disconnect: async function () { try { if (dev) await dev.close(); } catch (e) {} }
+      disconnect: async function () { try { if (dev) await dev.close(); } catch (e) {} pendingIn = null; }
     };
   }
 
