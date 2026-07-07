@@ -171,17 +171,12 @@ function makeWebUsb(showAll) {
   ];
   return {
     name: "WebUSB",
-    connect: async function () {
-      // reuse an already-permitted adapter (robust on reconnect); else prompt
-      dev = null;
-      try {
-        var known = await navigator.usb.getDevices();
-        for (var i = 0; i < known.length; i++) {
-          var v = known[i].vendorId;
-          if (showAll || v === 0x1A86 || v === 0x10C4 || v === 0x0403 || v === 0x067B) { dev = known[i]; break; }
-        }
-      } catch (e) {}
-      if (!dev) dev = await navigator.usb.requestDevice({ filters: filters });
+    connect: async function (preDevice) {
+      // requestDevice() MUST be the first await inside the click handler, or
+      // Android Chrome drops the user activation and rejects with NotFoundError
+      // ("No device selected"). preDevice is only passed by the page-load
+      // auto-reconnect, which runs outside a gesture and needs no prompt.
+      dev = preDevice || await navigator.usb.requestDevice({ filters: filters });
       await dev.open();
       if (dev.configuration === null) await dev.selectConfiguration(1);
       var iface = dev.configuration.interfaces[0];
@@ -214,10 +209,10 @@ function setTx(msg, cls)   { txStatus.textContent = msg;   txStatus.className   
 
 var isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
-async function tryConnect(makeTransport) {
+async function tryConnect(makeTransport, preDevice) {
   transport = makeTransport();
-  setConn("Choose the radio's USB adapter in the dialog…");
-  await transport.connect();
+  if (!preDevice) setConn("Choose the radio's USB adapter in the dialog…");
+  await transport.connect(preDevice);
   setConn("Connected via " + transport.name + ".", "ok");
   connectBtn.classList.add("connected");
   connectBtn.textContent = "Radio Connected";
@@ -281,6 +276,20 @@ beaconBtn.addEventListener("click", function () {
     else setTx("Could not get location. Is GPS on?", "err");
   }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
 });
+
+// auto-reconnect on load to an already-permitted adapter (no gesture needed,
+// so getDevices() here does NOT harm the requestDevice activation later)
+if (isMobile && ("usb" in navigator)) {
+  navigator.usb.getDevices().then(function (list) {
+    for (var i = 0; i < list.length; i++) {
+      var v = list[i].vendorId;
+      if (v === 0x1A86 || v === 0x10C4 || v === 0x0403 || v === 0x067B) {
+        tryConnect(function () { return makeWebUsb(false); }, list[i]).catch(function () {});
+        return;
+      }
+    }
+  }).catch(function () {});
+}
 
 // hint about support up front
 if (!("serial" in navigator) && !("usb" in navigator)) {
