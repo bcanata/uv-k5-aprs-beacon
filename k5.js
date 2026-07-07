@@ -423,6 +423,117 @@ var K5 = (function () {
     return true;
   };
 
+  // ---- channel editor: EEPROM codec (egzumer/F4HWN layout) ----
+  // CTCSS in 0.1 Hz; DCS values are octal-of-value (0x0013 -> "023").
+  var CTCSS = [670,693,719,744,770,797,825,854,885,915,948,974,1000,1035,1072,1109,1148,1188,1230,1273,
+    1318,1365,1413,1462,1514,1567,1598,1622,1655,1679,1713,1738,1773,1799,1835,1862,1899,1928,1966,1995,
+    2035,2065,2107,2181,2257,2291,2336,2418,2503,2541];
+  var DCS = [0x0013,0x0015,0x0016,0x0019,0x001A,0x001E,0x0023,0x0027,0x0029,0x002B,0x002C,0x0035,0x0039,0x003A,0x003B,0x003C,
+    0x004C,0x004D,0x004E,0x0052,0x0055,0x0059,0x005A,0x005C,0x0063,0x0065,0x006A,0x006D,0x006E,0x0072,0x0075,0x007A,
+    0x007C,0x0085,0x008A,0x0093,0x0095,0x0096,0x00A3,0x00A4,0x00A5,0x00A6,0x00A9,0x00AA,0x00AD,0x00B1,0x00B3,0x00B5,
+    0x00B6,0x00B9,0x00BC,0x00C6,0x00C9,0x00CD,0x00D5,0x00D9,0x00DA,0x00E3,0x00E6,0x00E9,0x00EE,0x00F4,0x00F5,0x00F9,
+    0x0109,0x010A,0x010B,0x0113,0x0119,0x011A,0x0125,0x0126,0x012A,0x012C,0x012D,0x0132,0x0134,0x0135,0x0136,0x0143,
+    0x0146,0x014E,0x0153,0x0156,0x015A,0x0165,0x0166,0x0169,0x016C,0x0175,0x0186,0x018A,0x0194,0x0197,0x0199,0x019A,
+    0x01AC,0x01B2,0x01B5,0x01B9,0x01BC,0x01C3,0x01CA,0x01D3]; // 104
+  var STEP_HZ = [250,500,625,1000,1250,2500,833,1,5,10,25,50,100,125,900,1500,2000,3000,5000,10000,12500,20000,25000,50000]; // *10 Hz
+  var POWER = ["USER","LOW1","LOW2","LOW3","LOW4","LOW5","MID","HIGH"];
+  var MODU  = ["FM","AM","USB"];
+  // CodeType: 0 off, 1 CTCSS, 2 DCS-N, 3 DCS-I
+  function toneLabel(codeType, code){
+    if (codeType === 1) return "CT " + (CTCSS[code] / 10).toFixed(1);
+    if (codeType === 2) return "D" + ("00" + DCS[code].toString(8)).slice(-3) + "N";
+    if (codeType === 3) return "D" + ("00" + DCS[code].toString(8)).slice(-3) + "I";
+    return "off";
+  }
+  function decodeChannel(rec, attr, nameBytes){
+    var dv = new DataView(rec.buffer, rec.byteOffset, rec.length);
+    var empty = (attr === 0xFF);
+    var name = "";
+    for (var i = 0; nameBytes && i < 10 && nameBytes[i] >= 32 && nameBytes[i] < 127; i++) name += String.fromCharCode(nameBytes[i]);
+    var d12 = rec[12];
+    return {
+      empty: empty,
+      rxFreq: dv.getUint32(0, true),                 // 10 Hz units
+      txOffset: dv.getUint32(4, true),
+      rxCode: rec[8], txCode: rec[9],
+      rxCodeType: rec[10] & 0x0F, txCodeType: (rec[10] >> 4) & 0x0F,
+      offsetDir: rec[11] & 0x0F,                      // 0 off, 1 +, 2 -
+      modulation: (rec[11] >> 4) & 0x0F,
+      reverse: d12 & 1, bandwidth: (d12 >> 1) & 1, power: (d12 >> 2) & 7,
+      busyLock: (d12 >> 5) & 1, txLock: (d12 >> 6) & 1,
+      step: rec[14],
+      band: attr & 7, compander: (attr >> 3) & 3,
+      scan1: (attr >> 5) & 1, scan2: (attr >> 6) & 1, scan3: (attr >> 7) & 1,
+      name: name.trim()
+    };
+  }
+  // returns { rec:Uint8Array(16), attr:byte, name:Uint8Array(16) }
+  function encodeChannel(c){
+    var rec = new Uint8Array(16), dv = new DataView(rec.buffer);
+    dv.setUint32(0, c.rxFreq >>> 0, true);
+    dv.setUint32(4, (c.txOffset || 0) >>> 0, true);
+    rec[8]  = c.rxCode & 0xFF; rec[9] = c.txCode & 0xFF;
+    rec[10] = (c.rxCodeType & 0x0F) | ((c.txCodeType & 0x0F) << 4);
+    rec[11] = (c.offsetDir & 0x0F) | ((c.modulation & 0x0F) << 4);
+    rec[12] = (c.reverse & 1) | ((c.bandwidth & 1) << 1) | ((c.power & 7) << 2) | ((c.busyLock & 1) << 5) | ((c.txLock & 1) << 6);
+    rec[13] = 0; rec[14] = c.step & 0xFF; rec[15] = 0;
+    var attr = (c.band & 7) | ((c.compander & 3) << 3) | ((c.scan1 & 1) << 5) | ((c.scan2 & 1) << 6) | ((c.scan3 & 1) << 7);
+    var name = new Uint8Array(16); name.fill(0);
+    var s = (c.name || "").toUpperCase();
+    for (var i = 0; i < 10 && i < s.length; i++) name[i] = s.charCodeAt(i) & 0x7F;
+    return { rec: rec, attr: attr, name: name };
+  }
+  // read MR channels [first,last] -> array of decoded channel objects (with .index)
+  Radio.prototype.readChannels = function (first, last, onProgress){
+    var self = this; first = first || 0; last = (last == null) ? 199 : last;
+    return this._run(async function(){
+      var out = [];
+      // attributes page-aligned block covering [first,last]
+      var attrStart = 0x0D60 + first, attrLen = (last - first + 1);
+      var attrs = await self._readRange(0x0D60 + (first & ~7), (((last)|7) + 1) - (first & ~7));
+      for (var ch = first; ch <= last; ch++){
+        var rec  = await self.readCfg(ch * 16, 16);
+        var name = await self.readCfg(0x0F50 + ch * 16, 16);
+        var attr = attrs[(ch) - (first & ~7)];
+        var c = decodeChannel(rec, attr, name); c.index = ch;
+        out.push(c);
+        if (onProgress) onProgress(ch - first + 1, last - first + 1);
+      }
+      return out;
+    });
+  };
+  // read a >128 range by chunking (used for the attribute block)
+  Radio.prototype._readRange = async function (addr, len){
+    var out = new Uint8Array(len);
+    for (var a = 0; a < len; a += 128){ var n = Math.min(128, len - a); out.set(await this.readCfg(addr + a, n), a); }
+    return out;
+  };
+  // write one channel (record + name + attribute), read-modify-write the attr page
+  Radio.prototype.writeChannel = function (ch, c){
+    var self = this;
+    return this._run(async function(){
+      var e = encodeChannel(c);
+      await self.writeCfg(ch * 16, e.rec);                    // 16 B record (2 pages)
+      await self.writeCfg(0x0F50 + ch * 16, e.name);          // 16 B name (2 pages)
+      var pageAddr = 0x0D60 + (ch & ~7);                      // 8-channel attr page
+      var page = await self.readCfg(pageAddr, 8);
+      page = new Uint8Array(page); page[ch & 7] = e.attr;
+      await self.writeCfg(pageAddr, page);
+      return true;
+    });
+  };
+  // mark a channel empty (attr 0xFF) in its page
+  Radio.prototype.deleteChannel = function (ch){
+    var self = this;
+    return this._run(async function(){
+      var pageAddr = 0x0D60 + (ch & ~7);
+      var page = new Uint8Array(await self.readCfg(pageAddr, 8));
+      page[ch & 7] = 0xFF;
+      await self.writeCfg(pageAddr, page);
+      return true;
+    });
+  };
+
   // ---- transport picker + auto-reconnect helper ----
   var UA = (typeof navigator !== "undefined" && navigator.userAgent) || "";
   var isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(UA);
@@ -441,7 +552,10 @@ var K5 = (function () {
     extractFrame: extractFrame, ch341Divisor: ch341Divisor,
     makeWebSerial: makeWebSerial, makeWebUsb: makeWebUsb, Radio: Radio,
     pickTransport: pickTransport, supported: supported,
-    isMobile: isMobile, isIOS: isIOS, TS: TS
+    isMobile: isMobile, isIOS: isIOS, TS: TS,
+    // channel editor codec + tables
+    CTCSS: CTCSS, DCS: DCS, STEP_HZ: STEP_HZ, POWER: POWER, MODU: MODU,
+    toneLabel: toneLabel, decodeChannel: decodeChannel, encodeChannel: encodeChannel
   };
 })();
 
