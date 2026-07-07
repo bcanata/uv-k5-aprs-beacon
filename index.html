@@ -113,6 +113,7 @@
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </div>
+  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b3</div>
 
   <nav class="tabs">
     <a id="tab-install" href="#install" data-i18n="nav.install">Install</a>
@@ -269,7 +270,7 @@
 
 </div>
 
-<script src="k5.js"></script>
+<script src="k5.js?v=3"></script>
 <script>
 "use strict";
 
@@ -632,8 +633,26 @@ window.addEventListener("hashchange", routeFromHash);
     try {
       await t.connect();
       radio = new K5.Radio(t);
-      var ver = await radio.hello();
-      if (!ver){ st("stConnect", S.noAnswer, "err"); return; }
+      var ver = null;
+      for (var attempt = 0; attempt < 3 && !ver; attempt++) ver = await radio.hello();
+      if (!ver){
+        // DIAGNOSTIC (build b3): resend hello and dump whatever the radio returns, raw.
+        // 0 bytes => the reply isn't reaching the browser; N bytes => a parse/timing issue.
+        var got = new Uint8Array(0);
+        try {
+          await t.send(K5.frameCommand(0x0514, new Uint8Array(K5.TS)));
+          var dl = Date.now() + 1500;
+          while (Date.now() < dl){
+            var c = await t.recv(256, 250);
+            if (c && c.length){ var nn = new Uint8Array(got.length + c.length); nn.set(got); nn.set(c, got.length); got = nn; }
+          }
+        } catch(e){}
+        var hex = Array.prototype.map.call(got, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
+        $("raw").value = "DIAG build b3 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
+        $("raw").style.display = "block";
+        st("stConnect", S.noAnswer, "err");
+        return;
+      }
       st("stConnect", S.connected(ver), "ok");
       stepState("s1","done"); activate("s2"); $("btnBackup").disabled = false;
     } catch(e){
