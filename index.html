@@ -141,24 +141,22 @@ function makeWebUsb(showAll) {
     if (r && r.status && r.status !== "ok")
       throw new Error("ctrl " + tag + " returned " + r.status);
   }
-  function ch341BaudPair(baud) {
-    // classic CH340G baud: high/divisor -> reg 0x1312, low byte -> reg 0x0F2C
-    var FACTOR = 1532620800, factor = Math.floor(FACTOR / baud), divisor = 3;
-    while (factor > 0xfff0 && divisor) { factor = factor >> 3; divisor--; }
-    factor = 0x10000 - factor;
-    return {
-      hi: ((factor & 0xff00) | divisor | 0x80) & 0xffff,  // 38400 -> 0x6483
-      lo: factor & 0xff                                   // 38400 -> 0x18
-    };
+  function ch341Divisor(baud) {
+    // modern ch341 divisor (matches the current Linux/Android kernel driver)
+    var CLK = 48000000, fact = 1, ps, clkDiv, div;
+    var minRate = [CLK / (4096 * 512), CLK / (512 * 512), CLK / (64 * 512), CLK / (8 * 512)];
+    for (ps = 3; ps >= 0; ps--) if (baud > minRate[ps]) break;
+    if (ps < 0) ps = 0;
+    clkDiv = 1 << (12 - 3 * ps - fact);
+    div = Math.floor(CLK / (clkDiv * baud));
+    if (div < 9 || div > 255) { fact = 0; clkDiv = 1 << (12 - 3 * ps); div = Math.floor(CLK / (clkDiv * baud)); }
+    return ((((0x100 - div) & 0xff) << 8) | (fact << 2) | ps) & 0xffff;  // 38400 -> 0x6403
   }
   async function ch340Init() {
     try {
-      var b = ch341BaudPair(38400);
-      await ctrl("init",   0xA1, 0x0000, 0x0000);  // serial init
-      await ctrl("baudHi", 0x9A, 0x1312, b.hi);    // baud divisor/prescaler
-      await ctrl("baudLo", 0x9A, 0x0F2C, b.lo);    // baud low byte
-      await ctrl("lcr",    0x9A, 0x2518, 0x00C3);  // 8N1 + ENABLE RX + ENABLE TX (turns the TX pin on)
-      await ctrl("hs",     0xA1, 0x501F, 0xD90A);  // status/handshake
+      await ctrl("init", 0xA1, 0x0000, 0x0000);              // serial init
+      await ctrl("baud", 0x9A, 0x1312, ch341Divisor(38400)); // baud 38400 (0x6403)
+      await ctrl("lcr",  0x9A, 0x2518, 0x00C3);              // 8N1 + enable RX + enable TX
     } catch (e) {
       throw new Error("CH340 setup failed at step '" + step + "': " +
                       (e && e.message ? e.message : e));
