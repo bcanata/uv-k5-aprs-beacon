@@ -127,6 +127,28 @@
   #rcPtt.tx{background:#d11;box-shadow:0 0 0 3px rgba(209,17,17,.3);}
   .rc-tx{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-top:1rem;}
   .rc-tx label{display:flex;flex-direction:column;gap:.3rem;font:600 .64rem/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+
+  /* ---- channels editor ---- */
+  .ch-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem;}
+  .ch-actions .act{flex:1;min-width:9rem;margin-top:0;text-align:center;}
+  .ch-scroll{margin-top:1rem;border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:62vh;}
+  table.ch{width:100%;border-collapse:collapse;font:500 .8rem/1.25 ui-monospace,Menlo,monospace;}
+  table.ch th{position:sticky;top:0;background:var(--card);text-align:left;color:var(--muted);font-size:.62rem;
+      letter-spacing:.07em;text-transform:uppercase;padding:.5rem .5rem;border-bottom:1px solid var(--line);}
+  table.ch td{padding:.5rem .5rem;border-bottom:1px solid var(--line);white-space:nowrap;}
+  table.ch tbody tr{cursor:pointer;}
+  table.ch tbody tr:hover td{background:var(--card);}
+  table.ch .num{color:var(--muted);}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:1rem;z-index:50;}
+  .modal.on{display:flex;}
+  .modal .box{background:var(--bg);border:1px solid var(--line);border-radius:12px;max-width:27rem;width:100%;max-height:92vh;overflow:auto;padding:1.2rem 1.2rem 1.3rem;}
+  .modal h3{font:700 1.05rem/1.2 ui-monospace,Menlo,monospace;margin:0 0 .9rem;}
+  .modal .row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.6rem;}
+  .modal label{display:flex;flex-direction:column;gap:.25rem;font:600 .6rem/1.1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .modal label.wide{grid-column:1 / -1;}
+  .modal .btns{display:flex;gap:.5rem;margin-top:1.1rem;flex-wrap:wrap;}
+  .modal .btns .act{margin-top:0;flex:1;text-align:center;}
+  .modal .del{background:var(--warn);color:#fff;}
 </style>
 </head>
 <body>
@@ -139,13 +161,14 @@
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </div>
-  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b6</div>
+  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b7</div>
 
   <nav class="tabs">
     <a id="tab-install" href="#install" data-i18n="nav.install">Install</a>
     <a id="tab-beacon"  href="#beacon"  data-i18n="nav.beacon">Web Beacon</a>
     <a id="tab-code"    href="#code"    data-i18n="nav.code">Codes</a>
     <a id="tab-control" href="#control" data-i18n="nav.control">Control</a>
+    <a id="tab-channels" href="#channels" data-i18n="nav.channels">Channels</a>
   </nav>
 
   <!-- =============================== INSTALL =============================== -->
@@ -348,6 +371,64 @@
     </div>
   </section>
 
+  <!-- =============================== CHANNELS =============================== -->
+  <section class="view" id="view-channels">
+    <h1 data-i18n="chan.h1">Channels</h1>
+    <p class="lede" data-i18n="chan.lede"></p>
+
+    <button id="chConnect" class="big" type="button" data-i18n="chan.connect"></button>
+    <p class="status" id="chStatus"></p>
+
+    <div id="chPanel" style="display:none">
+      <div class="ch-actions">
+        <button class="act" id="chRead" data-i18n="chan.read"></button>
+        <button class="act dark" id="chImportBtn" data-i18n="chan.import"></button>
+        <input type="file" id="chFile" accept=".bin" style="display:none">
+      </div>
+      <div class="bar" id="chBar"><i></i></div>
+      <p class="status" id="chProgress"></p>
+      <div class="ch-scroll" id="chScroll" style="display:none">
+        <table class="ch">
+          <thead><tr>
+            <th data-i18n="chan.col.num">#</th><th data-i18n="chan.col.name">Name</th>
+            <th data-i18n="chan.col.rx">RX MHz</th><th data-i18n="chan.col.mod">Mod</th>
+            <th data-i18n="chan.col.tone">Tone</th>
+          </tr></thead>
+          <tbody id="chBody"></tbody>
+        </table>
+      </div>
+      <p class="fine" data-i18n-html="chan.fine"></p>
+    </div>
+  </section>
+
+  <!-- channel edit modal -->
+  <div class="modal" id="chModal">
+    <div class="box">
+      <h3 id="chmTitle">Channel</h3>
+      <div class="row">
+        <label class="wide"><span data-i18n="chan.f.name"></span><input id="cmName" maxlength="10" autocomplete="off" spellcheck="false"></label>
+        <label><span data-i18n="chan.f.rx"></span><input id="cmRx" inputmode="decimal" placeholder="145.5000"></label>
+        <label><span data-i18n="chan.f.offset"></span><input id="cmOff" inputmode="decimal" placeholder="0.6000"></label>
+        <label><span data-i18n="chan.f.dir"></span><select id="cmDir"></select></label>
+        <label><span data-i18n="chan.f.mod"></span><select id="cmMod"></select></label>
+        <label><span data-i18n="chan.f.bw"></span><select id="cmBw"></select></label>
+        <label><span data-i18n="chan.f.pow"></span><select id="cmPow"></select></label>
+        <label><span data-i18n="chan.f.step"></span><select id="cmStep"></select></label>
+        <label><span data-i18n="chan.f.rxtType"></span><select id="cmRxtType"></select></label>
+        <label><span data-i18n="chan.f.rxtCode"></span><select id="cmRxtCode"></select></label>
+        <label><span data-i18n="chan.f.txtType"></span><select id="cmTxtType"></select></label>
+        <label><span data-i18n="chan.f.txtCode"></span><select id="cmTxtCode"></select></label>
+        <label class="wide" style="flex-direction:row;align-items:center;gap:.5rem"><input type="checkbox" id="cmScan" style="width:1.1rem;height:1.1rem"><span data-i18n="chan.f.scan"></span></label>
+      </div>
+      <p class="status" id="cmStatus"></p>
+      <div class="btns">
+        <button class="act" id="cmSave" data-i18n="chan.save"></button>
+        <button class="act del" id="cmDelete" data-i18n="chan.delete"></button>
+        <button class="act dark" id="cmCancel" data-i18n="chan.cancel"></button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script src="k5.js?v=6"></script>
@@ -363,7 +444,7 @@ var T = {
   en: {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Edition (TA1JS)" },
-    nav: { install: "Install", beacon: "Web Beacon", code: "Codes", control: "Control" },
+    nav: { install: "Install", beacon: "Web Beacon", code: "Codes", control: "Control", channels: "Channels" },
     install: {
       h1: "Firmware Installer",
       lede: "Flashes the UV-K5 APRS firmware and configures it entirely in your browser over the programming cable — back up, wipe, flash, and set your callsign & position. Nothing to install.",
@@ -511,13 +592,38 @@ var T = {
         connFail: "Connection failed.",
         portBusy: "The serial port is already open — close any other tab using the radio, then retry."
       }
+    },
+    chan: {
+      h1: "Channels",
+      lede: "Read, edit and import the radio's memory channels over USB.",
+      connect: "Connect Radio", connected: "Connected",
+      read: "Read from radio", import: "Import from backup (.bin)",
+      fine: "Click a row to edit. Import reads channels from an EEPROM <code>.bin</code> backup and writes them to the radio (calibration is never touched). On the amateur-band build, out-of-band channels store and receive but won't transmit.",
+      col: { num: "#", name: "Name", rx: "RX MHz", mod: "Mod", tone: "Tone" },
+      f: { name: "Name", rx: "RX (MHz)", offset: "TX offset (MHz)", dir: "Shift", mod: "Modulation", bw: "Bandwidth", pow: "TX power", step: "Step", rxtType: "RX tone", rxtCode: "RX code", txtType: "TX tone", txtCode: "TX code", scan: "In scan list 1" },
+      save: "Save to radio", delete: "Delete", cancel: "Cancel",
+      st: {
+        connecting: "Connecting…",
+        connected: function(v){ return "Connected: " + v; },
+        connFail: "Connection failed.",
+        portBusy: "The serial port is already open — close any other tab using the radio, then retry.",
+        reading: function(d,t){ return "Reading channels " + d + "/" + t + "…"; },
+        readDone: function(n){ return n + " channels read."; },
+        importReading: "Reading backup file…",
+        importBad: "That file isn't a valid 8 KB UV-K5 EEPROM backup.",
+        importWriting: function(d,t){ return "Writing channel " + d + "/" + t + "…"; },
+        importDone: function(n){ return n + " channels imported — power-cycle the radio to see them."; },
+        saved: function(n){ return "Channel " + (n+1) + " saved."; },
+        deleted: function(n){ return "Channel " + (n+1) + " deleted."; },
+        writeFail: function(e){ return "Write failed: " + e; }
+      }
     }
   },
 
   tr: {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Sürümü (TA1JS)" },
-    nav: { install: "Kurulum", beacon: "Canlı Beacon", code: "Kodlar", control: "Kontrol" },
+    nav: { install: "Kurulum", beacon: "Canlı Beacon", code: "Kodlar", control: "Kontrol", channels: "Kanallar" },
     install: {
       h1: "Firmware Kurulumu",
       lede: "UV-K5 APRS firmware'ini tarayıcınızdan programlama kablosuyla yükler ve yapılandırır — yedekle, temizle, yükle, çağrı işareti ve konumunu ayarla. Kurulacak yazılım yok.",
@@ -665,6 +771,31 @@ var T = {
         connFail: "Bağlantı başarısız.",
         portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeyi kapatıp tekrar deneyin."
       }
+    },
+    chan: {
+      h1: "Kanallar",
+      lede: "Telsizin hafıza kanallarını USB üzerinden oku, düzenle ve içe aktar.",
+      connect: "Telsizi Bağla", connected: "Bağlandı",
+      read: "Telsizden oku", import: "Yedekten içe aktar (.bin)",
+      fine: "Düzenlemek için bir satıra tıklayın. İçe aktarma, bir EEPROM <code>.bin</code> yedeğinden kanalları okuyup telsize yazar (kalibrasyona dokunulmaz). Amatör bant sürümünde bant dışı kanallar kaydedilir ve dinlenir ama yayın yapmaz.",
+      col: { num: "#", name: "Ad", rx: "RX MHz", mod: "Mod", tone: "Ton" },
+      f: { name: "Ad", rx: "RX (MHz)", offset: "TX kayması (MHz)", dir: "Kaydırma", mod: "Modülasyon", bw: "Bant genişliği", pow: "TX gücü", step: "Adım", rxtType: "RX ton", rxtCode: "RX kod", txtType: "TX ton", txtCode: "TX kod", scan: "Tarama listesi 1'de" },
+      save: "Telsize kaydet", delete: "Sil", cancel: "İptal",
+      st: {
+        connecting: "Bağlanıyor…",
+        connected: function(v){ return "Bağlandı: " + v; },
+        connFail: "Bağlantı başarısız.",
+        portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeyi kapatıp tekrar deneyin.",
+        reading: function(d,t){ return "Kanallar okunuyor " + d + "/" + t + "…"; },
+        readDone: function(n){ return n + " kanal okundu."; },
+        importReading: "Yedek dosyası okunuyor…",
+        importBad: "Bu dosya geçerli bir 8 KB UV-K5 EEPROM yedeği değil.",
+        importWriting: function(d,t){ return "Kanal yazılıyor " + d + "/" + t + "…"; },
+        importDone: function(n){ return n + " kanal içe aktarıldı — görmek için telsizi kapatıp açın."; },
+        saved: function(n){ return "Kanal " + (n+1) + " kaydedildi."; },
+        deleted: function(n){ return "Kanal " + (n+1) + " silindi."; },
+        writeFail: function(e){ return "Yazma başarısız: " + e; }
+      }
     }
   }
 };
@@ -700,7 +831,7 @@ function applyLang(){
 })();
 
 /* ======================= view routing ======================= */
-var VIEWS = ["install", "beacon", "code", "control"];
+var VIEWS = ["install", "beacon", "code", "control", "channels"];
 function showView(name){
   if (VIEWS.indexOf(name) < 0) name = "install";
   for (var i = 0; i < VIEWS.length; i++){
@@ -780,7 +911,7 @@ window.addEventListener("hashchange", routeFromHash);
       var ver = null;
       for (var attempt = 0; attempt < 3 && !ver; attempt++) ver = await radio.hello();
       if (!ver){
-        // DIAGNOSTIC (build b6): resend hello and dump whatever the radio returns, raw.
+        // DIAGNOSTIC (build b7): resend hello and dump whatever the radio returns, raw.
         // 0 bytes => the reply isn't reaching the browser; N bytes => a parse issue.
         var got = new Uint8Array(0);
         try {
@@ -792,7 +923,7 @@ window.addEventListener("hashchange", routeFromHash);
           }
         } catch(e){}
         var hex = Array.prototype.map.call(got, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
-        $("raw").value = "DIAG build b6 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
+        $("raw").value = "DIAG build b7 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
         $("raw").style.display = "block";
         st("stConnect", S.noAnswer, "err");
         try { await t.disconnect(); } catch(_e){}
@@ -1306,6 +1437,150 @@ window.addEventListener("hashchange", routeFromHash);
       radio = null;
     }
   });
+})();
+
+/* ======================= CHANNELS EDITOR ======================= */
+(function(){
+  var radio = null, connected = false, channels = [], editing = null;
+  var chConnect = $("chConnect");
+  function chSt(m,c){ var e=$("chStatus"); e.textContent=m; e.className="status "+(c||""); }
+  function chProg(m,c){ var e=$("chProgress"); e.textContent=m; e.className="status "+(c||""); }
+  function chBar(d,t){ var b=$("chBar"); b.classList.add("on"); b.firstElementChild.style.width=(t?Math.round(d*100/t):0)+"%"; }
+  function opt(sel,v,label){ var o=document.createElement("option"); o.value=v; o.textContent=label; sel.appendChild(o); }
+  function esc(s){ return (s||"").replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+  function stepLabel(i){ var v=K5.STEP_HZ[i]; return v==null?("?"+i):((v/100).toString()+" kHz"); }
+
+  // populate the fixed modal selects once
+  (function initSelects(){
+    [["Off",0],["+",1],["−",2]].forEach(function(p){ opt($("cmDir"),p[1],p[0]); });
+    K5.MODU.forEach(function(m,i){ opt($("cmMod"),i,m); });
+    [["Wide",0],["Narrow",1]].forEach(function(p){ opt($("cmBw"),p[1],p[0]); });
+    K5.POWER.forEach(function(p,i){ opt($("cmPow"),i,p); });
+    for (var s=0; s<K5.STEP_HZ.length; s++) opt($("cmStep"),s,stepLabel(s));
+    ["cmRxtType","cmTxtType"].forEach(function(id){ [["Off",0],["CTCSS",1],["DCS-N",2],["DCS-I",3]].forEach(function(p){ opt($(id),p[1],p[0]); }); });
+  })();
+  function fillCodes(typeSel, codeSel, keep){
+    var t=parseInt(typeSel.value,10); codeSel.innerHTML="";
+    if(t===1){ K5.CTCSS.forEach(function(v,i){ opt(codeSel,i,(v/10).toFixed(1)+" Hz"); }); codeSel.disabled=false; }
+    else if(t===2||t===3){ K5.DCS.forEach(function(v,i){ opt(codeSel,i,"D"+("00"+v.toString(8)).slice(-3)); }); codeSel.disabled=false; }
+    else { opt(codeSel,0,"—"); codeSel.disabled=true; }
+    if(keep!=null && keep < codeSel.options.length) codeSel.value=keep;
+  }
+  $("cmRxtType").addEventListener("change", function(){ fillCodes($("cmRxtType"),$("cmRxtCode")); });
+  $("cmTxtType").addEventListener("change", function(){ fillCodes($("cmTxtType"),$("cmTxtCode")); });
+
+  function renderTable(){
+    var b=$("chBody"); b.innerHTML="";
+    var any=false;
+    channels.forEach(function(c){
+      if(c.empty) return; any=true;
+      var tr=document.createElement("tr");
+      tr.innerHTML="<td class='num'>"+(c.index+1)+"</td><td>"+esc(c.name||"")+"</td><td>"+(c.rxFreq/1e5).toFixed(4)+"</td><td>"+(K5.MODU[c.modulation]||"?")+"</td><td>"+K5.toneLabel(c.txCodeType,c.txCode)+"</td>";
+      tr.addEventListener("click", function(){ openEdit(c); });
+      b.appendChild(tr);
+    });
+    $("chScroll").style.display = any?"block":"none";
+  }
+
+  function openEdit(c){
+    editing=c;
+    $("chmTitle").textContent = "CH " + (c.index+1);
+    $("cmName").value = c.name||"";
+    $("cmRx").value = (c.rxFreq/1e5).toFixed(4);
+    $("cmOff").value = (c.txOffset/1e5).toFixed(4);
+    $("cmDir").value = c.offsetDir||0;
+    $("cmMod").value = c.modulation||0;
+    $("cmBw").value = c.bandwidth||0;
+    $("cmPow").value = c.power||0;
+    $("cmStep").value = c.step||0;
+    $("cmRxtType").value = c.rxCodeType||0; fillCodes($("cmRxtType"),$("cmRxtCode"),c.rxCode);
+    $("cmTxtType").value = c.txCodeType||0; fillCodes($("cmTxtType"),$("cmTxtCode"),c.txCode);
+    $("cmScan").checked = !!c.scan1;
+    $("cmStatus").textContent="";
+    $("chModal").classList.add("on");
+  }
+  function closeModal(){ $("chModal").classList.remove("on"); editing=null; }
+  $("cmCancel").addEventListener("click", closeModal);
+  $("chModal").addEventListener("click", function(e){ if(e.target===$("chModal")) closeModal(); });
+
+  $("cmSave").addEventListener("click", async function(){
+    if(!editing||!radio) return;
+    var S=D().chan.st, c=editing;
+    c.name=$("cmName").value.toUpperCase().slice(0,10);
+    c.rxFreq=Math.round(parseFloat($("cmRx").value||"0")*1e5)>>>0;
+    c.txOffset=Math.round(parseFloat($("cmOff").value||"0")*1e5)>>>0;
+    c.offsetDir=parseInt($("cmDir").value,10);
+    c.modulation=parseInt($("cmMod").value,10);
+    c.bandwidth=parseInt($("cmBw").value,10);
+    c.power=parseInt($("cmPow").value,10);
+    c.step=parseInt($("cmStep").value,10);
+    c.rxCodeType=parseInt($("cmRxtType").value,10); c.rxCode=$("cmRxtCode").disabled?0:parseInt($("cmRxtCode").value,10);
+    c.txCodeType=parseInt($("cmTxtType").value,10); c.txCode=$("cmTxtCode").disabled?0:parseInt($("cmTxtCode").value,10);
+    c.scan1=$("cmScan").checked?1:0; c.empty=false;
+    $("cmStatus").textContent="…";
+    try{ await radio.writeChannel(c.index, c); }
+    catch(e){ $("cmStatus").textContent=S.writeFail(e&&e.message?e.message:e); return; }
+    renderTable(); closeModal(); chProg(S.saved(c.index),"ok");
+  });
+  $("cmDelete").addEventListener("click", async function(){
+    if(!editing||!radio) return;
+    var S=D().chan.st, c=editing;
+    try{ await radio.deleteChannel(c.index); }
+    catch(e){ $("cmStatus").textContent=S.writeFail(e&&e.message?e.message:e); return; }
+    c.empty=true; renderTable(); closeModal(); chProg(S.deleted(c.index),"ok");
+  });
+
+  chConnect.addEventListener("click", async function(){
+    var S=D().chan.st;
+    if(connected) return;
+    var t=K5.pickTransport(); if(!t){ chSt(D().beacon.st.neither,"err"); return; }
+    chSt(S.connecting);
+    try{
+      await t.connect(); radio=new K5.Radio(t);
+      var ver=await radio.hello();
+      if(!ver){ chSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} radio=null; return; }
+      connected=true; chSt(S.connected(ver),"ok");
+      chConnect.textContent=D().chan.connected; chConnect.classList.add("connected");
+      $("chPanel").style.display="block";
+    }catch(e){
+      var m=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(m);
+      chSt(busy?S.portBusy:S.connFail,"err"); try{if(t)await t.disconnect();}catch(_e){} radio=null;
+    }
+  });
+
+  $("chRead").addEventListener("click", async function(){
+    if(!radio) return; var S=D().chan.st;
+    $("chRead").disabled=true;
+    try{
+      channels = await radio.readChannels(0,199,function(d,t){ chBar(d,t); chProg(S.reading(d,t)); });
+      renderTable();
+      chProg(S.readDone(channels.filter(function(c){return !c.empty;}).length),"ok");
+    }catch(e){ chProg(S.writeFail(e&&e.message?e.message:e),"err"); }
+    $("chRead").disabled=false;
+  });
+
+  $("chImportBtn").addEventListener("click", function(){ if(radio) $("chFile").click(); else chProg(D().chan.st.connFail,"err"); });
+  $("chFile").addEventListener("change", async function(){
+    var f=this.files[0]; if(!f||!radio) return;
+    var S=D().chan.st; chProg(S.importReading);
+    var buf=new Uint8Array(await f.arrayBuffer());
+    this.value="";
+    if(buf.length < 0x1C00){ chProg(S.importBad,"err"); return; }
+    var list=[];
+    for(var ch=0; ch<200; ch++){
+      var attr=buf[0x0D60+ch]; if(attr===0xFF) continue;
+      var rec=buf.slice(ch*16, ch*16+16), name=buf.slice(0x0F50+ch*16, 0x0F50+ch*16+16);
+      var c=K5.decodeChannel(rec, attr, name); c.index=ch; list.push(c);
+    }
+    for(var i=0;i<list.length;i++){
+      try{ await radio.writeChannel(list[i].index, list[i]); }
+      catch(e){ chProg(S.writeFail(e&&e.message?e.message:e),"err"); return; }
+      chBar(i+1,list.length); chProg(S.importWriting(i+1,list.length));
+    }
+    channels=list; renderTable(); chProg(S.importDone(list.length),"ok");
+  });
+
+  onLang(function(){ chConnect.textContent = connected ? D().chan.connected : D().chan.connect; });
 })();
 
 /* ======================= boot ======================= */
