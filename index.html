@@ -132,23 +132,36 @@ function makeWebSerial() {
 
 // minimal CH340 driver over WebUSB (baud 38400, 8N1)
 function makeWebUsb(showAll) {
-  var dev = null, epOut = 0;
-  async function ctrl(req, val, idx) {
-    await dev.controlTransferOut(
+  var dev = null, epOut = 0, step = "";
+  async function ctrl(tag, req, val, idx) {
+    step = tag;
+    var r = await dev.controlTransferOut(
       { requestType: "vendor", recipient: "device", request: req, value: val, index: idx });
+    if (r && r.status && r.status !== "ok")
+      throw new Error("ctrl " + tag + " returned " + r.status);
   }
-  function ch341Baud(baud) {
-    // deterministic ch341 divisor (matches the Linux ch341 driver)
+  function ch341BaudPair(baud) {
+    // classic CH340G baud: high/divisor -> reg 0x1312, low byte -> reg 0x0F2C
     var FACTOR = 1532620800, factor = Math.floor(FACTOR / baud), divisor = 3;
     while (factor > 0xfff0 && divisor) { factor = factor >> 3; divisor--; }
     factor = 0x10000 - factor;
-    return ((factor & 0xff00) | divisor | 0x80) & 0xffff;  // wIndex for reg 0x1312
+    return {
+      hi: ((factor & 0xff00) | divisor | 0x80) & 0xffff,  // 38400 -> 0x6483
+      lo: factor & 0xff                                   // 38400 -> 0x18
+    };
   }
   async function ch340Init() {
-    await ctrl(0xA1, 0, 0);                       // serial init
-    await ctrl(0x9A, 0x1312, ch341Baud(38400));   // baud 38400 (0x6483)
-    await ctrl(0x9A, 0x2518, 0x00C3);             // LCR: 8 data, no parity, 1 stop, RX+TX on
-    await ctrl(0xA4, 0xFF9F, 0x0000);             // assert DTR + RTS
+    try {
+      var b = ch341BaudPair(38400);
+      // classic CH340G register set (the one Android already accepts)
+      await ctrl("init",   0xA1, 0x0000, 0x0000);  // serial init
+      await ctrl("baudHi", 0x9A, 0x1312, b.hi);    // baud divisor/prescaler
+      await ctrl("baudLo", 0x9A, 0x0F2C, b.lo);    // baud low byte  (8N1 default)
+      await ctrl("hs",     0xA1, 0x501F, 0xD90A);  // status/handshake
+    } catch (e) {
+      throw new Error("CH340 setup failed at step '" + step + "': " +
+                      (e && e.message ? e.message : e));
+    }
   }
   // common USB-serial adapters (CH340/CH910x, CP210x, FTDI, PL2303)
   var filters = showAll ? [] : [
