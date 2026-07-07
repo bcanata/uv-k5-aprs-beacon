@@ -149,6 +149,23 @@
   .modal .btns{display:flex;gap:.5rem;margin-top:1.1rem;flex-wrap:wrap;}
   .modal .btns .act{margin-top:0;flex:1;text-align:center;}
   .modal .del{background:var(--warn);color:#fff;}
+
+  /* ---- EEPROM hex editor ---- */
+  .hexbar{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-top:1rem;}
+  .hexbar .act{margin-top:0;}
+  .hexjump{display:flex;align-items:center;gap:.4rem;font:600 .66rem/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .hexjump input{width:6rem;}
+  .hexwrap{margin-top:1rem;border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:64vh;}
+  table.hex{border-collapse:collapse;font:500 .72rem/1.35 ui-monospace,Menlo,monospace;}
+  table.hex td{padding:.12rem .4rem;border-bottom:1px solid var(--line);white-space:nowrap;}
+  table.hex td.ad{color:var(--muted);user-select:none;position:sticky;left:0;background:var(--bg);}
+  table.hex input.hx{width:24rem;font:500 .72rem/1.35 ui-monospace,Menlo,monospace;color:var(--ink);background:transparent;
+      border:1px solid transparent;border-radius:4px;padding:.1rem .35rem;text-transform:uppercase;letter-spacing:.03em;}
+  table.hex input.hx:focus{border-color:var(--accent);background:var(--field-bg);outline:none;}
+  table.hex input.hx.dirty{color:var(--accent);font-weight:700;}
+  table.hex input.hx.bad{border-color:var(--warn);color:var(--warn);}
+  table.hex tr.calib td.ad{color:var(--warn);}
+  table.hex td.as{color:var(--muted);letter-spacing:.05em;}
 </style>
 </head>
 <body>
@@ -161,7 +178,7 @@
       <button type="button" data-lang="en" aria-pressed="true">EN</button>
     </div>
   </div>
-  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b7</div>
+  <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b8</div>
 
   <nav class="tabs">
     <a id="tab-install" href="#install" data-i18n="nav.install">Install</a>
@@ -169,6 +186,7 @@
     <a id="tab-code"    href="#code"    data-i18n="nav.code">Codes</a>
     <a id="tab-control" href="#control" data-i18n="nav.control">Control</a>
     <a id="tab-channels" href="#channels" data-i18n="nav.channels">Channels</a>
+    <a id="tab-eeprom" href="#eeprom" data-i18n="nav.eeprom">EEPROM</a>
   </nav>
 
   <!-- =============================== INSTALL =============================== -->
@@ -401,6 +419,30 @@
     </div>
   </section>
 
+  <!-- =============================== EEPROM =============================== -->
+  <section class="view" id="view-eeprom">
+    <h1 data-i18n="eep.h1">EEPROM Editor</h1>
+    <p class="lede" data-i18n="eep.lede"></p>
+    <div class="note warn" data-i18n-html="eep.warn"></div>
+
+    <button id="epConnect" class="big" type="button" data-i18n="eep.connect"></button>
+    <p class="status" id="epStatus"></p>
+
+    <div id="epPanel" style="display:none">
+      <div class="hexbar">
+        <button class="act" id="epRead" data-i18n="eep.read"></button>
+        <button class="act" id="epWrite" disabled data-i18n="eep.write"></button>
+        <label class="hexjump"><span data-i18n="eep.jump"></span><input id="epJump" maxlength="4" placeholder="0E30"></label>
+      </div>
+      <div class="bar" id="epBar"><i></i></div>
+      <p class="status" id="epProgress"></p>
+      <div class="hexwrap" id="epWrap" style="display:none">
+        <table class="hex"><tbody id="epBody"></tbody></table>
+      </div>
+      <p class="fine" data-i18n-html="eep.fine"></p>
+    </div>
+  </section>
+
   <!-- channel edit modal -->
   <div class="modal" id="chModal">
     <div class="box">
@@ -444,7 +486,7 @@ var T = {
   en: {
     meta: { title: "UV-K5 APRS · TA1JS" },
     brand: { eyebrow: "Quansheng UV-K5 · APRS Edition (TA1JS)" },
-    nav: { install: "Install", beacon: "Web Beacon", code: "Codes", control: "Control", channels: "Channels" },
+    nav: { install: "Install", beacon: "Web Beacon", code: "Codes", control: "Control", channels: "Channels", eeprom: "EEPROM" },
     install: {
       h1: "Firmware Installer",
       lede: "Flashes the UV-K5 APRS firmware and configures it entirely in your browser over the programming cable — back up, wipe, flash, and set your callsign & position. Nothing to install.",
@@ -615,6 +657,28 @@ var T = {
         importDone: function(n){ return n + " channels imported — power-cycle the radio to see them."; },
         saved: function(n){ return "Channel " + (n+1) + " saved."; },
         deleted: function(n){ return "Channel " + (n+1) + " deleted."; },
+        writeFail: function(e){ return "Write failed: " + e; }
+      }
+    },
+    eep: {
+      h1: "EEPROM Editor",
+      lede: "Read the radio's entire 8 KB EEPROM and edit any byte, then write your changes back over USB.",
+      warn: "<b>Expert tool.</b> Editing raw EEPROM can corrupt your settings — <b>back up first</b> (Install → Back Up). The calibration region <code>0x1E00–0x1FFF</code> is per-radio and irreplaceable; rows there are marked and need an extra confirm to write.",
+      connect: "Connect Radio", connected: "Connected",
+      read: "Read EEPROM", write: "Write changes", jump: "Go to",
+      fine: "Each row is 16 bytes of hex (space-separated) with its address and ASCII. Edit the hex, then Write changes — only rows you touched are written, 8 bytes at a time. Changed rows are highlighted; invalid rows turn red.",
+      st: {
+        connecting: "Connecting…",
+        connected: function(v){ return "Connected: " + v; },
+        connFail: "Connection failed.",
+        portBusy: "The serial port is already open — close any other tab using the radio, then retry.",
+        reading: function(d,t){ return "Reading EEPROM " + Math.round(d*100/t) + "%…"; },
+        readDone: "8 KB read. Edit any row, then Write changes.",
+        noChanges: "No changes to write.",
+        calibConfirm: function(n){ return n + " changed row(s) are in the calibration region (0x1E00+). Writing there can degrade RX/TX. Write anyway?"; },
+        badRows: "Some rows aren't valid 16-byte hex — fix the red rows first.",
+        writing: function(d,t){ return "Writing " + d + "/" + t + " rows…"; },
+        writeDone: function(n){ return n + " rows written — power-cycle the radio to apply."; },
         writeFail: function(e){ return "Write failed: " + e; }
       }
     }
@@ -796,6 +860,28 @@ var T = {
         deleted: function(n){ return "Kanal " + (n+1) + " silindi."; },
         writeFail: function(e){ return "Yazma başarısız: " + e; }
       }
+    },
+    eep: {
+      h1: "EEPROM Düzenleyici",
+      lede: "Telsizin 8 KB'lık tüm EEPROM'unu oku, herhangi bir baytı düzenle ve değişiklikleri USB üzerinden geri yaz.",
+      warn: "<b>Uzman aracı.</b> Ham EEPROM düzenlemek ayarlarını bozabilir — <b>önce yedek al</b> (Kurulum → Yedekle). Kalibrasyon bölgesi <code>0x1E00–0x1FFF</code> telsize özeldir ve yeri doldurulamaz; oradaki satırlar işaretlidir ve yazmak için ek onay ister.",
+      connect: "Telsizi Bağla", connected: "Bağlandı",
+      read: "EEPROM'u oku", write: "Değişiklikleri yaz", jump: "Git",
+      fine: "Her satır 16 bayt onaltılık (boşlukla ayrılmış), adresi ve ASCII'si ile. Hex'i düzenle, sonra Değişiklikleri yaz — yalnızca dokunduğun satırlar yazılır, 8'er bayt. Değişen satırlar vurgulanır; geçersiz satırlar kırmızıya döner.",
+      st: {
+        connecting: "Bağlanıyor…",
+        connected: function(v){ return "Bağlandı: " + v; },
+        connFail: "Bağlantı başarısız.",
+        portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeyi kapatıp tekrar deneyin.",
+        reading: function(d,t){ return "EEPROM okunuyor %" + Math.round(d*100/t) + "…"; },
+        readDone: "8 KB okundu. Bir satırı düzenle, sonra Değişiklikleri yaz.",
+        noChanges: "Yazılacak değişiklik yok.",
+        calibConfirm: function(n){ return n + " değişen satır kalibrasyon bölgesinde (0x1E00+). Oraya yazmak RX/TX'i bozabilir. Yine de yazılsın mı?"; },
+        badRows: "Bazı satırlar geçerli 16-bayt hex değil — önce kırmızı satırları düzelt.",
+        writing: function(d,t){ return "Satır yazılıyor " + d + "/" + t + "…"; },
+        writeDone: function(n){ return n + " satır yazıldı — uygulamak için telsizi kapatıp açın."; },
+        writeFail: function(e){ return "Yazma başarısız: " + e; }
+      }
     }
   }
 };
@@ -831,7 +917,7 @@ function applyLang(){
 })();
 
 /* ======================= view routing ======================= */
-var VIEWS = ["install", "beacon", "code", "control", "channels"];
+var VIEWS = ["install", "beacon", "code", "control", "channels", "eeprom"];
 function showView(name){
   if (VIEWS.indexOf(name) < 0) name = "install";
   for (var i = 0; i < VIEWS.length; i++){
@@ -911,7 +997,7 @@ window.addEventListener("hashchange", routeFromHash);
       var ver = null;
       for (var attempt = 0; attempt < 3 && !ver; attempt++) ver = await radio.hello();
       if (!ver){
-        // DIAGNOSTIC (build b7): resend hello and dump whatever the radio returns, raw.
+        // DIAGNOSTIC (build b8): resend hello and dump whatever the radio returns, raw.
         // 0 bytes => the reply isn't reaching the browser; N bytes => a parse issue.
         var got = new Uint8Array(0);
         try {
@@ -923,7 +1009,7 @@ window.addEventListener("hashchange", routeFromHash);
           }
         } catch(e){}
         var hex = Array.prototype.map.call(got, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
-        $("raw").value = "DIAG build b7 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
+        $("raw").value = "DIAG build b8 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
         $("raw").style.display = "block";
         st("stConnect", S.noAnswer, "err");
         try { await t.disconnect(); } catch(_e){}
@@ -1581,6 +1667,101 @@ window.addEventListener("hashchange", routeFromHash);
   });
 
   onLang(function(){ chConnect.textContent = connected ? D().chan.connected : D().chan.connect; });
+})();
+
+/* ======================= EEPROM HEX EDITOR ======================= */
+(function(){
+  var radio = null, connected = false, mem = null, dirty = new Set();
+  var epConnect = $("epConnect");
+  function epSt(m,c){ var e=$("epStatus"); e.textContent=m; e.className="status "+(c||""); }
+  function epProg(m,c){ var e=$("epProgress"); e.textContent=m; e.className="status "+(c||""); }
+  function epBar(d,t){ var b=$("epBar"); b.classList.add("on"); b.firstElementChild.style.width=(t?Math.round(d*100/t):0)+"%"; }
+  function hx2(b){ return ("0"+(b&0xFF).toString(16)).slice(-2).toUpperCase(); }
+  function esc(s){ return s.replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+  function hexRow(a){ var s=""; for(var i=0;i<16;i++) s+=(i?" ":"")+hx2(mem[a+i]); return s; }
+  function asciiRow(a){ var s=""; for(var i=0;i<16;i++){ var c=mem[a+i]; s+=(c>=32&&c<127)?String.fromCharCode(c):"."; } return s; }
+
+  function render(){
+    var rows=[];
+    for(var a=0;a<0x2000;a+=16){
+      rows.push("<tr class='r"+(a>=0x1E00?" calib":"")+"'>"+
+        "<td class='ad'>"+hx2(a>>8)+hx2(a&0xFF)+"</td>"+
+        "<td><input class='hx' spellcheck='false' autocomplete='off' data-a='"+a+"' value='"+hexRow(a)+"'></td>"+
+        "<td class='as' id='as"+a+"'>"+esc(asciiRow(a))+"</td></tr>");
+    }
+    $("epBody").innerHTML = rows.join("");
+    $("epWrap").style.display="block";
+  }
+
+  $("epBody").addEventListener("input", function(ev){
+    var inp=ev.target; if(!inp.classList||!inp.classList.contains("hx")) return;
+    var a=parseInt(inp.dataset.a,10);
+    var toks=inp.value.trim().split(/\s+/);
+    if(toks.length!==16 || !toks.every(function(t){ return /^[0-9a-fA-F]{1,2}$/.test(t); })){
+      inp.classList.add("bad"); return;
+    }
+    inp.classList.remove("bad");
+    for(var i=0;i<16;i++) mem[a+i]=parseInt(toks[i],16)&0xFF;
+    var as=$("as"+a); if(as) as.textContent=asciiRow(a);
+    inp.classList.add("dirty"); dirty.add(a);
+  });
+
+  function doJump(){
+    var a=parseInt(($("epJump").value||"").replace(/[^0-9a-fA-F]/g,""),16);
+    if(isNaN(a)) return;
+    a &= ~0xF; if(a<0)a=0; if(a>0x1FF0)a=0x1FF0;
+    var inp=$("epBody").querySelector("input[data-a='"+a+"']");
+    if(inp){ inp.scrollIntoView({block:"center"}); inp.focus(); }
+  }
+  $("epJump").addEventListener("keydown", function(ev){ if(ev.key==="Enter"){ ev.preventDefault(); doJump(); } });
+  $("epJump").addEventListener("change", doJump);
+
+  epConnect.addEventListener("click", async function(){
+    var S=D().eep.st; if(connected) return;
+    var t=K5.pickTransport(); if(!t){ epSt(D().beacon.st.neither,"err"); return; }
+    epSt(S.connecting);
+    try{
+      await t.connect(); radio=new K5.Radio(t);
+      var ver=await radio.hello();
+      if(!ver){ epSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} radio=null; return; }
+      connected=true; epSt(S.connected(ver),"ok");
+      epConnect.textContent=D().eep.connected; epConnect.classList.add("connected");
+      $("epPanel").style.display="block";
+    }catch(e){
+      var m=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(m);
+      epSt(busy?S.portBusy:S.connFail,"err"); try{if(t)await t.disconnect();}catch(_e){} radio=null;
+    }
+  });
+
+  $("epRead").addEventListener("click", async function(){
+    if(!radio) return; var S=D().eep.st; $("epRead").disabled=true;
+    try{
+      mem = await radio.dumpEeprom(0,0x2000,function(d,t){ epBar(d,t); epProg(S.reading(d,t)); });
+      dirty=new Set(); render(); $("epWrite").disabled=false; epProg(S.readDone,"ok");
+    }catch(e){ epProg(S.writeFail(e&&e.message?e.message:e),"err"); }
+    $("epRead").disabled=false;
+  });
+
+  $("epWrite").addEventListener("click", async function(){
+    if(!radio||!mem) return; var S=D().eep.st;
+    if($("epBody").querySelector("input.hx.bad")){ epProg(S.badRows,"err"); return; }
+    var rows=[]; dirty.forEach(function(a){ rows.push(a); }); rows.sort(function(x,y){ return x-y; });
+    if(rows.length===0){ epProg(S.noChanges); return; }
+    var calib=rows.filter(function(a){ return a>=0x1E00; }).length;
+    if(calib>0 && !confirm(S.calibConfirm(calib))) return;
+    $("epWrite").disabled=true;
+    try{
+      for(var i=0;i<rows.length;i++){
+        await radio.writeCfg(rows[i], mem.slice(rows[i], rows[i]+16));
+        epBar(i+1,rows.length); epProg(S.writing(i+1,rows.length));
+      }
+      rows.forEach(function(a){ var inp=$("epBody").querySelector("input[data-a='"+a+"']"); if(inp) inp.classList.remove("dirty"); });
+      dirty=new Set(); epProg(S.writeDone(rows.length),"ok");
+    }catch(e){ epProg(S.writeFail(e&&e.message?e.message:e),"err"); }
+    $("epWrite").disabled=false;
+  });
+
+  onLang(function(){ epConnect.textContent = connected ? D().eep.connected : D().eep.connect; });
 })();
 
 /* ======================= boot ======================= */
