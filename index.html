@@ -137,12 +137,18 @@ function makeWebUsb(showAll) {
     await dev.controlTransferOut(
       { requestType: "vendor", recipient: "device", request: req, value: val, index: idx });
   }
+  function ch341Baud(baud) {
+    // deterministic ch341 divisor (matches the Linux ch341 driver)
+    var FACTOR = 1532620800, factor = Math.floor(FACTOR / baud), divisor = 3;
+    while (factor > 0xfff0 && divisor) { factor = factor >> 3; divisor--; }
+    factor = 0x10000 - factor;
+    return ((factor & 0xff00) | divisor | 0x80) & 0xffff;  // wIndex for reg 0x1312
+  }
   async function ch340Init() {
-    // handshake + 8N1 + baud 38400 (register values from the CH34x datasheet)
-    await ctrl(0xA1, 0, 0);
-    await ctrl(0x9A, 0x1312, 0xB282);  // 38400: prescaler/divisor
-    await ctrl(0x9A, 0x0F2C, 0x0008);  // LCR: 8 data bits, no parity, 1 stop
-    await ctrl(0xA1, 0x501F, 0xD90A);  // modem/handshake
+    await ctrl(0xA1, 0, 0);                       // serial init
+    await ctrl(0x9A, 0x1312, ch341Baud(38400));   // baud 38400 (0x6483)
+    await ctrl(0x9A, 0x2518, 0x00C3);             // LCR: 8 data, no parity, 1 stop, RX+TX on
+    await ctrl(0xA4, 0xFF9F, 0x0000);             // assert DTR + RTS
   }
   // common USB-serial adapters (CH340/CH910x, CP210x, FTDI, PL2303)
   var filters = showAll ? [] : [
