@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UV-K5 APRS Installer</title>
+<title>UV-K5 APRS · TA1JS</title>
 <style>
   :root {
     --bg:#edf0ef; --ink:#182024; --muted:#5a6a70; --line:#ccd4d2;
     --accent:#c97a0a; --accent-ink:#fff; --ok:#2f7d4f; --warn:#a33f12;
     --field-bg:#fff; --card:#f6f8f7;
+    --lcd-bg:#201d12; --lcd-frame:#35301e; --lcd-digit:#ffb020; --lcd-dim:#8a7a45;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg:#131719; --ink:#e8ecec; --muted:#93a1a6; --line:#2c3438;
@@ -21,10 +22,19 @@
   body{background:var(--bg);color:var(--ink);margin:0;padding:0 1.25rem 4rem;
        font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;}
   .wrap{max-width:32rem;margin:0 auto;}
-  nav{display:flex;gap:.5rem;padding:1rem 0;border-bottom:1px solid var(--line);margin-bottom:1.5rem;
-      font:600 .74rem/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;flex-wrap:wrap;}
-  nav a{color:var(--muted);text-decoration:none;padding:.35rem .55rem;border-radius:6px;}
-  nav a.active{background:var(--accent);color:var(--accent-ink);}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:1rem 0 .5rem;}
+  .langtoggle{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;flex:none;}
+  .langtoggle button{border:0;background:transparent;color:var(--muted);
+      font:700 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;padding:.4rem .6rem;cursor:pointer;}
+  .langtoggle button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);}
+  .langtoggle button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px;}
+  nav.tabs{display:flex;gap:.4rem;padding:.4rem 0 1rem;border-bottom:1px solid var(--line);margin-bottom:1.4rem;
+      font:600 .74rem/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;flex-wrap:wrap;}
+  nav.tabs a{color:var(--muted);text-decoration:none;padding:.45rem .7rem;border-radius:6px;}
+  nav.tabs a.active{background:var(--accent);color:var(--accent-ink);}
+  nav.tabs a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .view{display:none;}
+  .view.active{display:block;}
   .eyebrow{font:600 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
   h1{font:700 1.7rem/1.2 ui-monospace,Menlo,monospace;letter-spacing:-.01em;margin:.35rem 0 .3rem;}
   .lede{color:var(--muted);margin:0 0 1rem;}
@@ -54,280 +64,962 @@
   label.f{display:flex;flex-direction:column;gap:.3rem;font:600 .68rem/1 ui-monospace,Menlo,monospace;
           letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
   label.f.wide{grid-column:1 / -1;}
-  input,select{font:500 1rem ui-monospace,Menlo,monospace;color:var(--ink);background:var(--field-bg);
+  input,select,textarea{font:500 1rem ui-monospace,Menlo,monospace;color:var(--ink);background:var(--field-bg);
       border:1px solid var(--line);border-radius:6px;padding:.5rem .6rem;width:100%;text-transform:uppercase;}
-  input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
-  textarea#raw{width:100%;min-height:4em;font:400 .78rem/1.4 ui-monospace,Menlo,monospace;color:var(--warn);
-      background:transparent;border:1px solid var(--line);border-radius:6px;padding:.5rem;display:none;margin-top:.5rem;}
-  iframe{width:100%;height:30rem;border:1px solid var(--line);border-radius:8px;margin-top:.6rem;background:var(--field-bg);}
-  a.beacon{display:inline-block;margin-top:.6rem;padding:.7rem 1rem;border-radius:6px;background:var(--ok);color:#04120a;
+  input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+  textarea{resize:none;}
+  textarea.raw{width:100%;min-height:4em;font:400 .78rem/1.4 ui-monospace,Menlo,monospace;color:var(--warn);
+      background:transparent;border:1px solid var(--line);border-radius:6px;padding:.5rem;display:none;margin-top:.5rem;text-transform:none;}
+  a.pill{display:inline-block;margin-top:.6rem;padding:.7rem 1rem;border-radius:6px;background:var(--ok);color:#04120a;
       text-decoration:none;font:700 .85rem/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;}
   .fine{color:var(--muted);font-size:.8rem;margin-top:1.5rem;border-top:1px solid var(--line);padding-top:1rem;}
   code{font-family:ui-monospace,Menlo,monospace;}
+
+  /* beacon + code shared LCD panels & big buttons */
+  button.big{display:block;width:100%;padding:.95rem 1rem;border:0;border-radius:6px;
+      font:700 .95rem/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;margin-top:1rem;}
+  button.big:first-of-type{margin-top:0;}
+  button.big:disabled{opacity:.45;cursor:not-allowed;}
+  button.big:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
+  #bxConnect{background:var(--ink);color:var(--bg);}
+  #bxConnect.connected{background:var(--ok);color:#04120a;}
+  #bxBeacon{background:var(--accent);color:var(--accent-ink);}
+  #bxTrack{background:var(--ok);color:#04120a;}
+  .lcd{background:var(--lcd-bg);border:1px solid var(--lcd-frame);border-radius:8px;
+       padding:1rem;display:none;flex-direction:column;gap:.5rem;margin-top:1rem;}
+  .lcd.on{display:flex;}
+  .lcd .label{font:600 .66rem/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--lcd-dim);}
+  .lcd .big{font:700 clamp(1.4rem,7vw,1.9rem)/1.3 ui-monospace,Menlo,monospace;color:var(--lcd-digit);font-variant-numeric:tabular-nums;}
+  .lcd .codeout{font:700 clamp(1.3rem,7vw,1.8rem)/1.45 ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;
+      letter-spacing:.06em;color:var(--lcd-digit);word-spacing:.35em;user-select:all;-webkit-user-select:all;overflow-wrap:break-word;}
+  .lcd .meta{font:400 .8rem/1.5 ui-monospace,Menlo,monospace;color:var(--lcd-dim);overflow-wrap:break-word;}
+  h2.sec{font:700 .85rem/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;
+      margin:1.6rem 0 0;padding-top:1.3rem;border-top:1px solid var(--line);}
+  ol.steps{margin:1rem 0 0;padding:0 0 0 1.4rem;display:flex;flex-direction:column;gap:.5rem;color:var(--ink);font-size:.92rem;}
+  ol.steps li::marker{font:700 .85rem ui-monospace,Menlo,monospace;color:var(--accent);}
+  ol.steps b{font-weight:650;}
+  .rowfields{display:flex;flex-direction:column;gap:.7rem;border-top:1px solid var(--line);padding-top:1.1rem;margin-top:1.1rem;}
+  .inlinelbl{font:600 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  input.tiny{width:4.5rem;margin:0 .4rem;display:inline;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <nav>
-    <a href="index.html" class="active">Installer</a>
-    <a href="beacon.html">Web Beacon</a>
-    <a href="code.html">Code Tool</a>
+
+  <div class="topbar">
+    <div class="eyebrow" data-i18n="brand.eyebrow">Quansheng UV-K5 · APRS Edition</div>
+    <div class="langtoggle" role="group" aria-label="Language">
+      <button type="button" data-lang="tr" aria-pressed="false">TR</button>
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <a id="tab-install" href="#install" data-i18n="nav.install">Install</a>
+    <a id="tab-beacon"  href="#beacon"  data-i18n="nav.beacon">Web Beacon</a>
+    <a id="tab-code"    href="#code"    data-i18n="nav.code">Codes</a>
   </nav>
 
-  <div class="eyebrow">Quansheng UV-K5 &middot; APRS Edition</div>
-  <h1>Firmware Installer</h1>
-  <p class="lede">Flashes the UV-K5 APRS firmware and configures it entirely in your browser over the programming cable — backup, wipe, flash, and set your callsign &amp; position. No software to install.</p>
+  <!-- =============================== INSTALL =============================== -->
+  <section class="view" id="view-install">
+    <h1 data-i18n="install.h1">Firmware Installer</h1>
+    <p class="lede" data-i18n="install.lede"></p>
 
-  <div class="note warn">
-    <b>Licensed amateurs only.</b> This firmware transmits on the 2&nbsp;m amateur band (144.800 MHz APRS). You need a valid amateur licence and must set your own callsign. Use at your own risk — flashing replaces the radio's firmware.
-  </div>
-  <div class="note" id="envNote"></div>
+    <div class="note warn" data-i18n-html="install.licnote"></div>
+    <div class="note" id="envNote"></div>
 
-  <ol class="wiz" id="wiz">
-    <li class="step" id="s1">
-      <h2>Turn the radio on, then connect</h2>
-      <p>Power the radio <b>ON normally</b> (do <b>not</b> hold PTT). Plug the programming cable into the radio and this computer. Then connect:</p>
-      <button class="act dark" id="btnConnect">Connect Radio</button>
-      <p class="status" id="stConnect"></p>
-      <textarea id="raw" readonly></textarea>
-    </li>
+    <ol class="wiz" id="wiz">
+      <li class="step" id="s1">
+        <h2 data-i18n="install.s1.h"></h2>
+        <p data-i18n-html="install.s1.p"></p>
+        <button class="act dark" id="btnConnect" data-i18n="install.s1.btn"></button>
+        <p class="status" id="stConnect"></p>
+        <textarea class="raw" id="raw" readonly></textarea>
+      </li>
 
-    <li class="step" id="s2">
-      <h2>Back up your radio</h2>
-      <p>We save the full EEPROM and the <b>factory calibration</b> (0x1E00–0x1FFF, unique to your radio — irreplaceable). Keep these files safe.</p>
-      <button class="act" id="btnBackup" disabled>Back Up &amp; Download</button>
-      <div class="bar" id="barBackup"><i></i></div>
-      <p class="status" id="stBackup"></p>
-    </li>
+      <li class="step" id="s2">
+        <h2 data-i18n="install.s2.h"></h2>
+        <p data-i18n-html="install.s2.p"></p>
+        <button class="act" id="btnBackup" disabled data-i18n="install.s2.btn"></button>
+        <div class="bar" id="barBackup"><i></i></div>
+        <p class="status" id="stBackup"></p>
+      </li>
 
-    <li class="step" id="s3">
-      <h2>Wipe old settings</h2>
-      <p>The radio's current settings use a different layout that would confuse the new firmware, so we clear them (0x0000–0x1DFF). <b>Calibration is preserved.</b> Run this only after you've saved the backup above.</p>
-      <button class="act" id="btnWipe" disabled>Wipe Settings</button>
-      <div class="bar" id="barWipe"><i></i></div>
-      <p class="status" id="stWipe"></p>
-    </li>
+      <li class="step" id="s3">
+        <h2 data-i18n="install.s3.h"></h2>
+        <p data-i18n-html="install.s3.p"></p>
+        <button class="act" id="btnWipe" disabled data-i18n="install.s3.btn"></button>
+        <div class="bar" id="barWipe"><i></i></div>
+        <p class="status" id="stWipe"></p>
+      </li>
 
-    <li class="step" id="s4">
-      <h2>Enter flash mode</h2>
-      <p>Turn the radio <b>OFF</b>. Then turn it <b>ON while holding PTT</b> — the flashlight LED lights up. Leave the cable plugged in. Then confirm:</p>
-      <button class="act" id="btnFlashMode" disabled>Confirm Flash Mode</button>
-      <p class="status" id="stFlashMode"></p>
-    </li>
+      <li class="step" id="s4">
+        <h2 data-i18n="install.s4.h"></h2>
+        <p data-i18n-html="install.s4.p"></p>
+        <button class="act" id="btnFlashMode" disabled data-i18n="install.s4.btn"></button>
+        <p class="status" id="stFlashMode"></p>
+      </li>
 
-    <li class="step" id="s5">
-      <h2>Flash the firmware</h2>
-      <p>This writes the APRS firmware (~59&nbsp;KB). Do not unplug or power off during flashing. <span id="flashDesktopOnly" style="display:none"><b>Desktop only</b> — open this page on a computer to flash.</span></p>
-      <button class="act" id="btnFlash" disabled>Flash Firmware</button>
-      <div class="bar" id="barFlash"><i></i></div>
-      <p class="status" id="stFlash"></p>
-    </li>
+      <li class="step" id="s5">
+        <h2 data-i18n="install.s5.h"></h2>
+        <p><span data-i18n="install.s5.p"></span> <span id="flashDesktopOnly" style="display:none" data-i18n-html="install.s5.desktoponly"></span></p>
+        <button class="act" id="btnFlash" disabled data-i18n="install.s5.btn"></button>
+        <div class="bar" id="barFlash"><i></i></div>
+        <p class="status" id="stFlash"></p>
+      </li>
 
-    <li class="step" id="s6">
-      <h2>Configure your station</h2>
-      <p>The radio rebooted into the new firmware. Enter your details — we write them straight into the radio.</p>
-      <div class="grid">
-        <label class="f">Callsign<input id="call" maxlength="6" placeholder="TA1ABC" autocomplete="off" spellcheck="false"></label>
-        <label class="f">SSID<select id="ssid"></select></label>
-        <label class="f wide">Message target (optional)<input id="msgto" maxlength="9" placeholder="TA1XYZ or TA1XYZ-7" autocomplete="off" spellcheck="false"></label>
-        <label class="f">Beacon interval<select id="intv"></select></label>
-        <label class="f">Listen on boot<select id="aprson"><option value="1">On</option><option value="0">Off</option></select></label>
-        <label class="f wide">Position
-          <input id="pos" placeholder="press Use my GPS" readonly>
-        </label>
-      </div>
-      <button class="act dark" id="btnGps">Use my GPS</button>
-      <button class="act" id="btnSave" disabled>Write to Radio</button>
-      <p class="status" id="stSave"></p>
-    </li>
+      <li class="step" id="s6">
+        <h2 data-i18n="install.s6.h"></h2>
+        <p data-i18n="install.s6.p"></p>
+        <div class="grid">
+          <label class="f"><span data-i18n="install.f.call"></span><input id="call" maxlength="6" placeholder="TA1ABC" autocomplete="off" spellcheck="false"></label>
+          <label class="f"><span data-i18n="install.f.ssid"></span><select id="ssid"></select></label>
+          <label class="f wide"><span data-i18n="install.f.msgto"></span><input id="msgto" maxlength="9" placeholder="TA1XYZ-7" autocomplete="off" spellcheck="false"></label>
+          <label class="f"><span data-i18n="install.f.intv"></span><select id="intv"></select></label>
+          <label class="f"><span data-i18n="install.f.aprson"></span><select id="aprson"></select></label>
+          <label class="f wide"><span data-i18n="install.f.pos"></span><input id="pos" readonly></label>
+        </div>
+        <button class="act dark" id="btnGps" data-i18n="install.s6.gps"></button>
+        <button class="act" id="btnSave" disabled data-i18n="install.s6.save"></button>
+        <p class="status" id="stSave"></p>
+      </li>
 
-    <li class="step" id="s7">
-      <h2>Done — how to use it</h2>
-      <p>Your radio is now an APRS station. Tune to <b>144.800 MHz</b>, set menu <b>APRS → ON</b> to listen, and use <b>TX</b> to beacon. Incoming messages to your callsign pop up on screen (any key clears them). Menu group: APRS, Intv, Call, SSID, Loc, Cmnt, MsgTo, Msg, Send, TX. VFO/TX are limited to amateur bands.</p>
-      <p><b>Beacon live GPS from this device:</b></p>
-      <a class="beacon" href="beacon.html">Open Web Beacon</a>
-      <p style="margin-top:1rem"><b>Generate codes to type on the keypad</b> (location, callsign, message):</p>
-      <iframe id="codeFrame" title="Code Tool" loading="lazy" allow="geolocation"></iframe>
-    </li>
-  </ol>
+      <li class="step" id="s7">
+        <h2 data-i18n="install.s7.h"></h2>
+        <p data-i18n-html="install.s7.p"></p>
+        <p data-i18n-html="install.s7.beacontitle"></p>
+        <a class="pill" href="#beacon" data-i18n="install.s7.beaconbtn"></a>
+        <p style="margin-top:1rem" data-i18n-html="install.s7.codeintro"></p>
+        <a class="pill" href="#code" data-i18n="install.s7.codebtn"></a>
+      </li>
+    </ol>
 
-  <p class="fine">Open source. Firmware &amp; tools: the UV-K5 APRS edition. On macOS install the WCH CH34x driver if the cable isn't detected. iOS browsers can't access USB — use a desktop, or Android Chrome with a USB-OTG cable (flashing needs a desktop).</p>
+    <p class="fine" data-i18n-html="install.fine"></p>
+  </section>
+
+  <!-- =============================== BEACON =============================== -->
+  <section class="view" id="view-beacon">
+    <h1 data-i18n="beacon.h1">Web Beacon</h1>
+    <p class="lede" data-i18n="beacon.lede"></p>
+
+    <button id="bxConnect" class="big" type="button" data-i18n="beacon.connect"></button>
+    <p class="status" id="bxConnStatus"></p>
+    <textarea id="bxRawErr" class="raw" readonly></textarea>
+    <a href="#" id="bxShowAll" style="display:none;font-size:.82rem;color:var(--accent)" data-i18n="beacon.showall"></a>
+
+    <button id="bxBeacon" class="big" type="button" disabled data-i18n="beacon.beaconBtn"></button>
+    <p class="status" id="bxTxStatus" role="status"></p>
+
+    <section class="lcd" id="bxFix">
+      <div class="label" data-i18n="beacon.lastfix"></div>
+      <div class="big" id="bxCoords"></div>
+      <div class="meta" id="bxMeta"></div>
+    </section>
+
+    <div class="rowfields">
+      <label class="inlinelbl"><span id="bxIvlLabel"></span>
+        <input id="bxIvl" type="number" min="30" max="1800" value="60" class="tiny"><span id="bxIvlUnit"></span>
+      </label>
+      <label class="inlinelbl" style="display:flex;align-items:center;gap:.5rem">
+        <input id="bxSmart" type="checkbox" checked style="width:1.1rem;height:1.1rem"> <span data-i18n="beacon.smartlabel"></span>
+      </label>
+    </div>
+    <button id="bxTrack" class="big" type="button" disabled data-i18n="beacon.trackStart"></button>
+    <p class="status" id="bxTrackStatus" role="status"></p>
+
+    <p class="fine" data-i18n-html="beacon.fine"></p>
+  </section>
+
+  <!-- =============================== CODE =============================== -->
+  <section class="view" id="view-code">
+    <h1 data-i18n="code.title">Code Tool</h1>
+    <p class="lede" data-i18n="code.lede"></p>
+
+    <h2 class="sec" data-i18n-html="code.h2loc"></h2>
+    <button id="git" class="big" type="button"></button>
+    <p class="status" id="cDurum" role="status"></p>
+    <section class="lcd" id="cPanel" aria-live="polite">
+      <div class="label" data-i18n="code.loclabel"></div>
+      <div class="codeout" id="cKod"></div>
+      <div class="meta" id="cMeta"></div>
+    </section>
+
+    <h2 class="sec" data-i18n-html="code.h2text"></h2>
+    <label class="f" style="margin-top:1rem"><span data-i18n="code.calllabel"></span>
+      <input id="cCagri" maxlength="9" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="TB1AAW">
+    </label>
+    <section class="lcd" id="cCagriPanel">
+      <div class="label t-pair" data-i18n="code.pair"></div>
+      <div class="codeout" id="cCagriKod"></div>
+      <div class="meta" id="cCagriMeta"></div>
+    </section>
+
+    <label class="f" style="margin-top:1rem"><span data-i18n="code.msglabel"></span>
+      <textarea id="cMesaj" maxlength="30" rows="2" autocomplete="off" spellcheck="false" placeholder="QSL 73"></textarea>
+    </label>
+    <section class="lcd" id="cMesajPanel">
+      <div class="label t-pair" data-i18n="code.pair"></div>
+      <div class="codeout" id="cMesajKod"></div>
+      <div class="meta" id="cMesajMeta"></div>
+    </section>
+
+    <ol class="steps" id="cSteps"></ol>
+    <p class="fine" data-i18n-html="code.fine"></p>
+  </section>
+
 </div>
 
 <script src="k5.js"></script>
 <script>
 "use strict";
-var FW_VERSION = "*F4HWN v4.3";  // must start with '*'
-var FW_URL = "f4hwn.bin";
 
-var radio = null, backedUp = false;
+/* ======================= firmware image ======================= */
+var FW_VERSION = "*TA1JS v4.3";   // must start with '*'
+var FW_URL = "ta1js.bin";
 
+/* ======================= i18n dictionary ======================= */
+var T = {
+  en: {
+    meta: { title: "UV-K5 APRS · TA1JS" },
+    brand: { eyebrow: "Quansheng UV-K5 · APRS Edition (TA1JS)" },
+    nav: { install: "Install", beacon: "Web Beacon", code: "Codes" },
+    install: {
+      h1: "Firmware Installer",
+      lede: "Flashes the UV-K5 APRS firmware and configures it entirely in your browser over the programming cable — back up, wipe, flash, and set your callsign & position. Nothing to install.",
+      licnote: "<b>Licensed amateurs only.</b> This firmware transmits on the 2 m amateur band (144.800 MHz APRS). You need a valid amateur licence and must set your own callsign. Use at your own risk — flashing replaces the radio's firmware.",
+      env: {
+        ios: "<b>iOS is not supported.</b> Apple browsers can't access USB serial. Use a desktop computer (Chrome/Edge), or an Android phone with Chrome + USB-OTG.",
+        unsupported: "<b>Unsupported browser.</b> Use Chrome or Edge (desktop), or Chrome on Android.",
+        mobile: "Android detected — backup, config and beaconing work here. <b>Flashing requires a desktop</b> (Web Serial); the flash step is hidden.",
+        desktop: "Desktop Chrome/Edge detected — full install supported."
+      },
+      s1: { h: "Turn the radio on, then connect", p: "Power the radio <b>ON normally</b> (do <b>not</b> hold PTT). Plug the programming cable into the radio and this computer. Then connect:", btn: "Connect Radio" },
+      s2: { h: "Back up your radio", p: "We save the full EEPROM and the <b>factory calibration</b> (0x1E00–0x1FFF, unique to your radio — irreplaceable). Keep these files safe.", btn: "Back Up & Download" },
+      s3: { h: "Wipe old settings", p: "The radio's current settings use a different layout that would confuse the new firmware, so we clear them (0x0000–0x1DFF). <b>Calibration is preserved.</b> Run this only after you've saved the backup above.", btn: "Wipe Settings" },
+      s4: { h: "Enter flash mode", p: "Turn the radio <b>OFF</b>. Then turn it <b>ON while holding PTT</b> — the flashlight LED lights up. Leave the cable plugged in. Then confirm:", btn: "Confirm Flash Mode" },
+      s5: { h: "Flash the firmware", p: "This writes the APRS firmware (~59 KB). Do not unplug or power off during flashing.", desktoponly: "<b>Desktop only</b> — open this page on a computer to flash.", btn: "Flash Firmware" },
+      s6: { h: "Configure your station", p: "The radio rebooted into the new firmware. Enter your details — we write them straight into the radio.", gps: "Use my GPS", save: "Write to Radio" },
+      f: { call: "Callsign", ssid: "SSID", msgto: "Message target (optional)", intv: "Beacon interval", aprson: "Listen on boot", pos: "Position" },
+      s7: {
+        h: "Done — how to use it",
+        p: "Your radio is now an APRS station. Tune to <b>144.800 MHz</b>, set menu <b>APRS → ON</b> to listen, and use <b>TX</b> to beacon. Incoming messages to your callsign pop up on screen (any key clears them). Menu group: APRS, Intv, Call, SSID, Loc, Cmnt, MsgTo, Msg, Send, TX. VFO/TX are limited to amateur bands.",
+        beacontitle: "<b>Beacon live GPS from this device:</b>",
+        beaconbtn: "Open Web Beacon",
+        codeintro: "<b>Generate codes to type on the keypad</b> (location, callsign, message):",
+        codebtn: "Open Code Tool"
+      },
+      fine: "Open source. Firmware & tools: the UV-K5 APRS edition (TA1JS). On macOS install the WCH CH34x driver if the cable isn't detected. iOS browsers can't access USB — use a desktop, or Android Chrome with a USB-OTG cable (flashing needs a desktop).",
+      posPlaceholder: "press Use my GPS",
+      on: "On", off: "Off", min: "min",
+      st: {
+        selectAdapter: "Select the radio's USB adapter…",
+        noSerial: "No USB serial support in this browser.",
+        noAnswer: "Connected, but the radio didn't answer. Is it ON (not in flash mode)?",
+        connected: function(v){ return "Connected. Radio firmware: " + v; },
+        connFailed: "Connection failed.",
+        reading: "Reading 8 KB EEPROM…",
+        backupOk: "Downloaded full EEPROM + calibration. Keep them safe!",
+        backupFail: function(e){ return "Backup failed: " + e; },
+        wipeConfirm: "You haven't downloaded a backup. Wipe anyway?",
+        wiping: "Wiping settings (calibration preserved)…",
+        wipeOk: "Settings wiped. Calibration untouched.",
+        wipeFail: function(e){ return "Wipe failed: " + e; },
+        verifyFail: "verify failed",
+        listening: "Listening for the bootloader…",
+        noBeacon: "No bootloader beacon. Turn the radio OFF, then ON holding PTT (LED on), cable in.",
+        flashModeOk: function(b){ return "Flash mode confirmed: " + b; },
+        flashDesktopOnly: "Flashing is desktop-only. Continue on a computer.",
+        genericErr: function(e){ return "Error: " + e; },
+        downloading: "Downloading firmware image…",
+        cannotLoad: function(u,s){ return "cannot load " + u + " (" + s + ")"; },
+        flashing: function(n){ return "Flashing " + n + " bytes… do not disconnect."; },
+        flashingChunk: function(d,t){ return "Flashing chunk " + d + "/" + t + "…"; },
+        flashComplete: "Flash complete! The radio is rebooting into the new firmware.",
+        newFwRunning: function(v){ return "New firmware running: " + v + ". Fill in your details."; },
+        flashFail: function(e){ return "Flash failed: " + e + " — power-cycle into flash mode and retry."; },
+        noGeo: "No geolocation in this browser.",
+        gettingGps: "Getting GPS…",
+        posCaptured: "Position captured.",
+        gpsFail: "Could not get GPS. Move outdoors and retry.",
+        badCall: "Enter a valid callsign first.",
+        writing: "Writing settings…",
+        saved: function(cs){ return "Saved " + cs + ". Radio rebooted with your settings."; },
+        writeFail: function(e){ return "Write failed: " + e; }
+      }
+    },
+    beacon: {
+      eyebrow: "UV-K5 · APRS WEB BEACON",
+      h1: "Web Beacon",
+      lede: "Reads your GPS position and beacons it through a UV-K5 connected over USB (Web Serial on desktop, WebUSB/OTG on Android).",
+      connect: "Connect Radio",
+      connected: "Radio Connected",
+      beaconBtn: "Beacon My Location",
+      showall: "Show all USB devices",
+      lastfix: "Last fix sent",
+      every: "Every", fastRate: "Fast rate", unitS: "s", unitAtSpeed: "s (@ speed)",
+      smartlabel: "Smart beaconing (speed & turns)",
+      trackStart: "Start Live Tracking", trackStop: "Stop Live Tracking",
+      fine: "Set the radio to <b>144.800 MHz</b>, APRS <b>ON</b>, and configure your callsign first. iOS is not supported (its browsers lack Web Serial/WebUSB). On Android use Chrome + a USB-OTG cable. The radio must be in <b>normal mode</b> (not flash mode). Note: with a plain 3-wire programming cable, TX may be blocked unless the firmware's cable-voltage exception is present.",
+      st: {
+        chooseAdapter: "Choose the radio's USB adapter in the dialog…",
+        connectedVia: function(n){ return "Connected via " + n + "."; },
+        noPick: "No adapter picked. If the list was empty, tap “Show all USB devices” below.",
+        connFailDetail: "Connection failed (full detail below).",
+        neither: "This browser supports neither WebUSB nor Web Serial. iOS cannot do this; on Android use Chrome.",
+        stillFailed: function(e){ return "Still failed: " + e; },
+        connectFirst: "Connect the radio first.",
+        noGeo: "This browser has no geolocation.",
+        waitingGps: "Waiting for GPS…",
+        beaconSent: "Beacon sent to radio.",
+        sendFail: function(e){ return "Send failed: " + e + " (still connected?)"; },
+        permDenied: "Location permission denied.",
+        gpsTimeout: "GPS timed out. Try again outdoors.",
+        locFail: "Could not get location. Is GPS on?",
+        acquiring: "Acquiring GPS…",
+        tracking: function(n,r,x){ return "Tracking — " + n + " sent (" + r + ")" + x + ". Keep screen on."; },
+        trackSendFail: function(e){ return "Send failed (" + e + "). Tracking stopped."; },
+        iosHint: "iOS browsers cannot access USB serial. Use a desktop, or an Android phone with Chrome + OTG.",
+        noWebSerial: "This browser has no WebUSB/Web Serial. Use Chrome (desktop or Android).",
+        androidNoUsb: "This mobile browser lacks WebUSB. Use Chrome for Android."
+      }
+    },
+    code: {
+      eyebrow: "UV-K5 · APRS FIELD TOOL",
+      title: "Code Tool",
+      lede: "Turns your location, callsign and message into number codes you enter on the radio keypad.",
+      h2loc: "Location → 73 Loc",
+      getBtn: "Get Location", refreshBtn: "Refresh Location", retryBtn: "Try Again", searchingBtn: "Locating…",
+      loclabel: "15 digits · Menu 73 Loc",
+      h2text: "Text → Call / MsgTo / Msg",
+      calllabel: "Callsign (Call / MsgTo)",
+      msglabel: "Message (Msg / Cmnt) — up to 30 characters",
+      pair: "Each character = 2 digits",
+      steps: [
+        "Generate the code on this page.",
+        "On the radio, open the matching menu field with MENU.",
+        "Enter the digits left to right — in text fields every <b>2 digits</b> become one character, shown instantly on screen.",
+        "<b>EXIT</b> = backspace · on the last character <b>MENU</b> = save."
+      ],
+      fine: "Character table: 00–09 digits, 10–35 A–Z, 36 space, 37–45 punctuation (-./?!@:,'). The location code's last digit is a checksum; a wrong code is rejected by the radio. Location resolution ~11 m.",
+      waiting: "Waiting for GPS…",
+      outOfRange: "Location seems out of range, try again.",
+      lowAcc: function(a){ return "Low GPS accuracy (±" + a + " m). Refresh outdoors."; },
+      denied: "Location permission denied. Allow location for this page in your browser settings.",
+      timeout: "Location request timed out. Try again outdoors.",
+      failed: "Could not get location. Is GPS on?",
+      noGeo: "This browser does not support geolocation.",
+      skipped: "  (unsupported characters skipped)"
+    }
+  },
+
+  tr: {
+    meta: { title: "UV-K5 APRS · TA1JS" },
+    brand: { eyebrow: "Quansheng UV-K5 · APRS Sürümü (TA1JS)" },
+    nav: { install: "Kurulum", beacon: "Canlı Beacon", code: "Kodlar" },
+    install: {
+      h1: "Firmware Kurulumu",
+      lede: "UV-K5 APRS firmware'ini tarayıcınızdan programlama kablosuyla yükler ve yapılandırır — yedekle, temizle, yükle, çağrı işareti ve konumunu ayarla. Kurulacak yazılım yok.",
+      licnote: "<b>Yalnızca lisanslı amatörler.</b> Bu firmware 2 m amatör bandında (144.800 MHz APRS) yayın yapar. Geçerli bir amatör lisansınız olmalı ve kendi çağrı işaretinizi ayarlamalısınız. Kullanım kendi sorumluluğunuzdadır — yükleme telsizin firmware'ini değiştirir.",
+      env: {
+        ios: "<b>iOS desteklenmiyor.</b> Apple tarayıcıları USB seri porta erişemez. Masaüstü bilgisayar (Chrome/Edge) veya Chrome + USB-OTG'li bir Android telefon kullanın.",
+        unsupported: "<b>Desteklenmeyen tarayıcı.</b> Chrome/Edge (masaüstü) veya Android'de Chrome kullanın.",
+        mobile: "Android algılandı — yedekleme, yapılandırma ve beacon burada çalışır. <b>Yükleme masaüstü gerektirir</b> (Web Serial); yükleme adımı gizlendi.",
+        desktop: "Masaüstü Chrome/Edge algılandı — tam kurulum destekleniyor."
+      },
+      s1: { h: "Telsizi aç, sonra bağlan", p: "Telsizi <b>normal şekilde AÇ</b> (PTT'ye <b>basma</b>). Programlama kablosunu telsize ve bu bilgisayara tak. Sonra bağlan:", btn: "Telsizi Bağla" },
+      s2: { h: "Telsizini yedekle", p: "Tüm EEPROM'u ve <b>fabrika kalibrasyonunu</b> (0x1E00–0x1FFF, telsizinize özel — yeri doldurulamaz) kaydederiz. Bu dosyaları güvende tutun.", btn: "Yedekle ve İndir" },
+      s3: { h: "Eski ayarları temizle", p: "Telsizin mevcut ayarları farklı bir düzende olduğundan yeni firmware'i şaşırtır; bu yüzden onları temizleriz (0x0000–0x1DFF). <b>Kalibrasyon korunur.</b> Bunu yalnızca yukarıdaki yedeği kaydettikten sonra çalıştırın.", btn: "Ayarları Temizle" },
+      s4: { h: "Yükleme moduna gir", p: "Telsizi <b>KAPAT</b>. Sonra <b>PTT'ye basılı tutarak AÇ</b> — el feneri LED'i yanar. Kabloyu takılı bırak. Sonra onayla:", btn: "Yükleme Modunu Onayla" },
+      s5: { h: "Firmware'i yükle", p: "Bu, APRS firmware'ini (~59 KB) yazar. Yükleme sırasında kabloyu çıkarma veya kapatma.", desktoponly: "<b>Yalnızca masaüstü</b> — yüklemek için bu sayfayı bilgisayarda açın.", btn: "Firmware'i Yükle" },
+      s6: { h: "İstasyonunu yapılandır", p: "Telsiz yeni firmware ile yeniden başladı. Bilgilerini gir — doğrudan telsize yazarız.", gps: "GPS'imi Kullan", save: "Telsize Yaz" },
+      f: { call: "Çağrı işareti", ssid: "SSID", msgto: "Mesaj hedefi (isteğe bağlı)", intv: "Beacon aralığı", aprson: "Açılışta dinle", pos: "Konum" },
+      s7: {
+        h: "Tamam — nasıl kullanılır",
+        p: "Telsiziniz artık bir APRS istasyonu. <b>144.800 MHz</b>'e ayarlayın, dinlemek için menüden <b>APRS → ON</b> yapın ve beacon için <b>TX</b> kullanın. Çağrı işaretinize gelen mesajlar ekranda belirir (herhangi bir tuş kapatır). Menü grubu: APRS, Intv, Call, SSID, Loc, Cmnt, MsgTo, Msg, Send, TX. VFO/TX amatör bantlarla sınırlıdır.",
+        beacontitle: "<b>Bu cihazdan canlı GPS beacon gönder:</b>",
+        beaconbtn: "Web Beacon'ı Aç",
+        codeintro: "<b>Tuş takımına girilecek kodları üret</b> (konum, çağrı işareti, mesaj):",
+        codebtn: "Kod Aracını Aç"
+      },
+      fine: "Açık kaynak. Firmware & araçlar: UV-K5 APRS sürümü (TA1JS). macOS'ta kablo algılanmazsa WCH CH34x sürücüsünü kurun. iOS tarayıcıları USB'ye erişemez — masaüstü ya da USB-OTG kablolu Android Chrome kullanın (yükleme masaüstü gerektirir).",
+      posPlaceholder: "GPS'imi Kullan'a bas",
+      on: "Açık", off: "Kapalı", min: "dk",
+      st: {
+        selectAdapter: "Telsizin USB adaptörünü seç…",
+        noSerial: "Bu tarayıcıda USB seri desteği yok.",
+        noAnswer: "Bağlandı ama telsiz yanıt vermedi. Açık mı (yükleme modunda değil)?",
+        connected: function(v){ return "Bağlandı. Telsiz firmware: " + v; },
+        connFailed: "Bağlantı başarısız.",
+        reading: "8 KB EEPROM okunuyor…",
+        backupOk: "Tüm EEPROM + kalibrasyon indirildi. Güvende tutun!",
+        backupFail: function(e){ return "Yedekleme başarısız: " + e; },
+        wipeConfirm: "Yedek indirmediniz. Yine de temizlensin mi?",
+        wiping: "Ayarlar temizleniyor (kalibrasyon korunuyor)…",
+        wipeOk: "Ayarlar temizlendi. Kalibrasyon korundu.",
+        wipeFail: function(e){ return "Temizleme başarısız: " + e; },
+        verifyFail: "doğrulama başarısız",
+        listening: "Bootloader dinleniyor…",
+        noBeacon: "Bootloader sinyali yok. Telsizi KAPAT, sonra PTT basılı AÇ (LED yanar), kablo takılı.",
+        flashModeOk: function(b){ return "Yükleme modu onaylandı: " + b; },
+        flashDesktopOnly: "Yükleme yalnızca masaüstünde. Bilgisayarda devam edin.",
+        genericErr: function(e){ return "Hata: " + e; },
+        downloading: "Firmware görüntüsü indiriliyor…",
+        cannotLoad: function(u,s){ return u + " yüklenemedi (" + s + ")"; },
+        flashing: function(n){ return n + " bayt yükleniyor… bağlantıyı kesme."; },
+        flashingChunk: function(d,t){ return "Parça " + d + "/" + t + " yükleniyor…"; },
+        flashComplete: "Yükleme tamam! Telsiz yeni firmware ile yeniden başlıyor.",
+        newFwRunning: function(v){ return "Yeni firmware çalışıyor: " + v + ". Bilgilerini gir."; },
+        flashFail: function(e){ return "Yükleme başarısız: " + e + " — yükleme moduna girip tekrar deneyin."; },
+        noGeo: "Bu tarayıcıda konum servisi yok.",
+        gettingGps: "GPS alınıyor…",
+        posCaptured: "Konum alındı.",
+        gpsFail: "GPS alınamadı. Açık alana çıkıp tekrar deneyin.",
+        badCall: "Önce geçerli bir çağrı işareti gir.",
+        writing: "Ayarlar yazılıyor…",
+        saved: function(cs){ return "Kaydedildi: " + cs + ". Telsiz ayarlarınla yeniden başladı."; },
+        writeFail: function(e){ return "Yazma başarısız: " + e; }
+      }
+    },
+    beacon: {
+      eyebrow: "UV-K5 · APRS CANLI BEACON",
+      h1: "Canlı Beacon",
+      lede: "GPS konumunu okur ve USB ile bağlı bir UV-K5 üzerinden beacon olarak gönderir (masaüstünde Web Serial, Android'de WebUSB/OTG).",
+      connect: "Telsizi Bağla",
+      connected: "Telsiz Bağlı",
+      beaconBtn: "Konumumu Gönder",
+      showall: "Tüm USB cihazlarını göster",
+      lastfix: "Gönderilen son konum",
+      every: "Her", fastRate: "Hızlı aralık", unitS: "sn", unitAtSpeed: "sn (@ hız)",
+      smartlabel: "Akıllı beacon (hız & dönüşler)",
+      trackStart: "Canlı Takibi Başlat", trackStop: "Canlı Takibi Durdur",
+      fine: "Önce telsizi <b>144.800 MHz</b>, APRS <b>ON</b> yapın ve çağrı işaretinizi ayarlayın. iOS desteklenmiyor (tarayıcılarında Web Serial/WebUSB yok). Android'de Chrome + USB-OTG kablo kullanın. Telsiz <b>normal modda</b> olmalı (yükleme modunda değil). Not: düz 3 telli programlama kablosuyla, firmware'in kablo-voltajı istisnası yoksa TX engellenebilir.",
+      st: {
+        chooseAdapter: "Açılan pencerede telsizin USB adaptörünü seç…",
+        connectedVia: function(n){ return n + " ile bağlandı."; },
+        noPick: "Adaptör seçilmedi. Liste boşsa aşağıdaki “Tüm USB cihazlarını göster”e dokun.",
+        connFailDetail: "Bağlantı başarısız (ayrıntı aşağıda).",
+        neither: "Bu tarayıcı ne WebUSB ne Web Serial destekliyor. iOS yapamaz; Android'de Chrome kullanın.",
+        stillFailed: function(e){ return "Yine başarısız: " + e; },
+        connectFirst: "Önce telsizi bağla.",
+        noGeo: "Bu tarayıcıda konum servisi yok.",
+        waitingGps: "GPS bekleniyor…",
+        beaconSent: "Beacon telsize gönderildi.",
+        sendFail: function(e){ return "Gönderim başarısız: " + e + " (hâlâ bağlı mı?)"; },
+        permDenied: "Konum izni reddedildi.",
+        gpsTimeout: "GPS zaman aşımı. Açık alanda tekrar dene.",
+        locFail: "Konum alınamadı. GPS açık mı?",
+        acquiring: "GPS alınıyor…",
+        tracking: function(n,r,x){ return "Takip — " + n + " gönderildi (" + r + ")" + x + ". Ekranı açık tut."; },
+        trackSendFail: function(e){ return "Gönderim başarısız (" + e + "). Takip durdu."; },
+        iosHint: "iOS tarayıcıları USB seri porta erişemez. Masaüstü ya da Chrome + OTG'li Android kullanın.",
+        noWebSerial: "Bu tarayıcıda WebUSB/Web Serial yok. Chrome (masaüstü veya Android) kullanın.",
+        androidNoUsb: "Bu mobil tarayıcıda WebUSB yok. Android için Chrome kullanın."
+      }
+    },
+    code: {
+      eyebrow: "UV-K5 · APRS SAHA ARACI",
+      title: "Kod Aracı",
+      lede: "Konum, çağrı işareti ve mesajı telsizin tuş takımıyla girilecek rakam kodlarına çevirir.",
+      h2loc: "Konum → 73 Loc",
+      getBtn: "Konumu Al", refreshBtn: "Konumu Yenile", retryBtn: "Tekrar Dene", searchingBtn: "Aranıyor…",
+      loclabel: "15 hane · Menü 73 Loc",
+      h2text: "Metin → Call / MsgTo / Msg",
+      calllabel: "Çağrı işareti (Call / MsgTo)",
+      msglabel: "Mesaj (Msg / Cmnt) — en çok 30 karakter",
+      pair: "Her karakter = 2 hane",
+      steps: [
+        "Kodu bu sayfadan üretin.",
+        "Telsizde ilgili menü alanına MENU ile girin.",
+        "Rakamları soldan sağa girin — metin alanlarında her <b>2 rakam</b> bir karaktere dönüşür, ekranda anında görürsünüz.",
+        "<b>EXIT</b> = geri sil · son karakterde <b>MENU</b> = kaydet."
+      ],
+      fine: "Karakter tablosu: 00–09 rakamlar, 10–35 A–Z, 36 boşluk, 37–45 noktalama (-./?!@:,'). Konum kodunun son hanesi kontrol hanesidir; hatalı kod telsizce reddedilir. Konum çözünürlüğü ~11 m.",
+      waiting: "GPS bekleniyor…",
+      outOfRange: "Konum aralık dışında görünüyor, tekrar deneyin.",
+      lowAcc: function(a){ return "GPS hassasiyeti düşük (±" + a + " m). Açık alanda yenileyin."; },
+      denied: "Konum izni reddedildi. Tarayıcı ayarlarından bu sayfaya konum izni verin.",
+      timeout: "Konum alma zaman aşımına uğradı. Açık alanda tekrar deneyin.",
+      failed: "Konum alınamadı. GPS açık mı?",
+      noGeo: "Bu tarayıcı konum servisini desteklemiyor.",
+      skipped: "  (desteklenmeyen karakterler atlandı)"
+    }
+  }
+};
+
+/* ======================= i18n core ======================= */
+var LANG = (navigator.language || "").toLowerCase().indexOf("tr") === 0 ? "tr" : "en";
+var LANG_HOOKS = [];
+function onLang(fn){ LANG_HOOKS.push(fn); }
+function D(){ return T[LANG]; }
+function dict(path){
+  var o = T[LANG], ks = path.split(".");
+  for (var i = 0; i < ks.length && o != null; i++) o = o[ks[i]];
+  return o;
+}
 function $(id){ return document.getElementById(id); }
-function setSt(id, msg, cls){ var e=$(id); e.textContent=msg; e.className="status "+(cls||""); }
-function stepState(id, cls){ $(id).classList.remove("active","done"); if(cls)$(id).classList.add(cls); }
-function activate(id){ $(id).classList.add("active"); }
-function bar(id, done, total){ var b=$(id); b.classList.add("on"); b.firstElementChild.style.width=(total?Math.round(done*100/total):0)+"%"; }
 
-// ---- environment check ----
+function applyLang(){
+  document.documentElement.lang = LANG;
+  var els = document.querySelectorAll("[data-i18n]");
+  for (var i = 0; i < els.length; i++){ var v = dict(els[i].getAttribute("data-i18n")); if (v != null) els[i].textContent = v; }
+  var hels = document.querySelectorAll("[data-i18n-html]");
+  for (var j = 0; j < hels.length; j++){ var h = dict(hels[j].getAttribute("data-i18n-html")); if (h != null) hels[j].innerHTML = h; }
+  var lb = document.querySelectorAll(".langtoggle button");
+  for (var k = 0; k < lb.length; k++) lb[k].setAttribute("aria-pressed", lb[k].dataset.lang === LANG ? "true" : "false");
+  document.title = dict("meta.title");
+  for (var m = 0; m < LANG_HOOKS.length; m++) LANG_HOOKS[m]();
+}
+
 (function(){
-  var n=$("envNote");
-  if (K5.isIOS){ n.innerHTML="<b>iOS is not supported.</b> Apple browsers can't access USB serial. Use a desktop computer (Chrome/Edge), or an Android phone with Chrome + USB-OTG."; n.classList.add("warn"); }
-  else if (!K5.supported()){ n.innerHTML="<b>Unsupported browser.</b> Use Chrome or Edge (desktop), or Chrome on Android."; n.classList.add("warn"); }
-  else if (K5.isMobile){ n.innerHTML="Android detected — backup, config and beaconing work here. <b>Flashing requires a desktop</b> (Web Serial); the flash step is hidden."; }
-  else { n.innerHTML="Desktop Chrome/Edge detected — full install supported."; }
-  if (K5.isMobile){ $("flashDesktopOnly").style.display="inline"; }
-  // populate SSID + interval selects
-  var s=$("ssid"); for(var i=0;i<=15;i++){var o=document.createElement("option");o.value=i;o.textContent=i;s.appendChild(o);} s.value=0;
-  var iv=$("intv"); [["0","Off"],["10","10 min"],["15","15 min"],["30","30 min"],["60","60 min"]].forEach(function(p){var o=document.createElement("option");o.value=p[0];o.textContent=p[1];iv.appendChild(o);}); iv.value=10;
-  // point the code-tool iframe at the sibling page
-  $("codeFrame").src="code.html";
-  activate("s1");
+  var btns = document.querySelectorAll(".langtoggle button");
+  for (var i = 0; i < btns.length; i++)
+    btns[i].addEventListener("click", function(){ LANG = this.dataset.lang; applyLang(); });
 })();
 
-// ---- step 1: connect + hello ----
-$("btnConnect").addEventListener("click", async function(){
-  var t = K5.pickTransport();
-  if (!t){ setSt("stConnect","No USB serial support in this browser.","err"); return; }
-  setSt("stConnect","Select the radio's USB adapter…");
-  try {
-    await t.connect();
-    radio = new K5.Radio(t);
-    var ver = await radio.hello();
-    if (!ver){ setSt("stConnect","Connected, but the radio didn't answer. Is it ON (not in flash mode)?","err"); return; }
-    setSt("stConnect","Connected. Radio firmware: "+ver, "ok");
-    stepState("s1","done"); activate("s2"); $("btnBackup").disabled=false;
-  } catch(e){
-    var m=(e&&e.message)?e.message:String(e);
-    setSt("stConnect","Connection failed.","err");
-    if(!/No device selected|cancel/i.test(m)){ $("raw").value=(e&&e.name?e.name+"\n":"")+m; $("raw").style.display="block"; }
+/* ======================= view routing ======================= */
+var VIEWS = ["install", "beacon", "code"];
+function showView(name){
+  if (VIEWS.indexOf(name) < 0) name = "install";
+  for (var i = 0; i < VIEWS.length; i++){
+    $("view-" + VIEWS[i]).classList.toggle("active", VIEWS[i] === name);
+    $("tab-" + VIEWS[i]).classList.toggle("active", VIEWS[i] === name);
   }
-});
-
-// ---- step 2: backup ----
-function download(name, bytes){
-  var url=URL.createObjectURL(new Blob([bytes],{type:"application/octet-stream"}));
-  var a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click();
-  a.remove(); setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  window.scrollTo(0, 0);
 }
-$("btnBackup").addEventListener("click", async function(){
-  if(!radio) return;
-  $("btnBackup").disabled=true; setSt("stBackup","Reading 8 KB EEPROM…");
-  try {
-    var full = await radio.dumpEeprom(0x0000, 0x2000, function(d,t){ bar("barBackup",d,t); });
-    var stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,"");
-    download("uvk5-eeprom-"+stamp+".bin", full);
-    download("uvk5-calibration-"+stamp+".bin", full.slice(0x1E00, 0x2000));
-    backedUp=true;
-    setSt("stBackup","Downloaded full EEPROM + calibration. Keep them safe!","ok");
-    stepState("s2","done"); activate("s3"); $("btnWipe").disabled=false;
-  } catch(e){ setSt("stBackup","Backup failed: "+(e&&e.message?e.message:e),"err"); $("btnBackup").disabled=false; }
-});
+function routeFromHash(){ showView((location.hash || "").replace("#", "")); }
+window.addEventListener("hashchange", routeFromHash);
 
-// ---- step 3: wipe ----
-$("btnWipe").addEventListener("click", async function(){
-  if(!radio) return;
-  if(!backedUp && !confirm("You haven't downloaded a backup. Wipe anyway?")) return;
-  $("btnWipe").disabled=true; setSt("stWipe","Wiping settings (calibration preserved)…");
-  try {
-    await radio.wipe(0x0000, 0x1E00, function(d,t){ bar("barWipe",d,t); });
-    // verify a couple of rows read back 0xFF
-    var chk = await radio.readCfg(0x0000, 8);
-    var ok = Array.prototype.every.call(chk, function(b){ return b===0xFF; });
-    if(!ok) throw new Error("verify failed");
-    setSt("stWipe","Settings wiped. Calibration untouched.","ok");
-    stepState("s3","done"); activate("s4"); $("btnFlashMode").disabled=false;
-  } catch(e){ setSt("stWipe","Wipe failed: "+(e&&e.message?e.message:e),"err"); $("btnWipe").disabled=false; }
-});
+/* ======================= INSTALL logic ======================= */
+(function(){
+  var radio = null, backedUp = false;
+  function st(id, msg, cls){ var e = $(id); e.textContent = msg; e.className = "status " + (cls || ""); }
+  function stepState(id, cls){ $(id).classList.remove("active","done"); if (cls) $(id).classList.add(cls); }
+  function activate(id){ $(id).classList.add("active"); }
+  function bar(id, done, total){ var b = $(id); b.classList.add("on"); b.firstElementChild.style.width = (total ? Math.round(done*100/total) : 0) + "%"; }
 
-// ---- step 4: confirm flash mode ----
-$("btnFlashMode").addEventListener("click", async function(){
-  if(!radio) return;
-  setSt("stFlashMode","Listening for the bootloader…");
-  try {
-    var b = await radio.waitBeacon(6000);
-    if(!b){ setSt("stFlashMode","No bootloader beacon. Turn the radio OFF, then ON holding PTT (LED on), cable in.","err"); return; }
-    setSt("stFlashMode","Flash mode confirmed: "+b, "ok");
-    stepState("s4","done"); activate("s5");
-    if(K5.isMobile){ setSt("stFlash","Flashing is desktop-only. Continue on a computer.","err"); }
-    else { $("btnFlash").disabled=false; }
-  } catch(e){ setSt("stFlashMode","Error: "+(e&&e.message?e.message:e),"err"); }
-});
-
-// ---- step 5: flash ----
-$("btnFlash").addEventListener("click", async function(){
-  if(!radio || K5.isMobile) return;
-  $("btnFlash").disabled=true; setSt("stFlash","Downloading firmware image…");
-  try {
-    var resp = await fetch(FW_URL, {cache:"no-store"});
-    if(!resp.ok) throw new Error("cannot load "+FW_URL+" ("+resp.status+")");
-    var fw = new Uint8Array(await resp.arrayBuffer());
-    setSt("stFlash","Flashing "+fw.length+" bytes… do not disconnect.");
-    await radio.flash(fw, FW_VERSION, function(d,t){ bar("barFlash",d,t); setSt("stFlash","Flashing chunk "+d+"/"+t+"…"); });
-    setSt("stFlash","Flash complete! The radio is rebooting into the new firmware.","ok");
-    stepState("s5","done"); activate("s6");
-    // give the radio a moment to boot, then verify
-    setTimeout(async function(){
-      try { var v=await radio.hello(); if(v){ setSt("stSave","New firmware running: "+v+". Fill in your details.","ok"); } }
-      catch(e){}
-    }, 2500);
-    $("btnSave").disabled=false;
-  } catch(e){
-    setSt("stFlash","Flash failed: "+(e&&e.message?e.message:e)+" — power-cycle into flash mode and retry.","err");
-    $("btnFlash").disabled=false;
+  // environment note + selects
+  function refreshEnv(){
+    var n = $("envNote"), S = D().install;
+    n.classList.remove("warn");
+    if (K5.isIOS){ n.innerHTML = S.env.ios; n.classList.add("warn"); }
+    else if (!K5.supported()){ n.innerHTML = S.env.unsupported; n.classList.add("warn"); }
+    else if (K5.isMobile){ n.innerHTML = S.env.mobile; }
+    else { n.innerHTML = S.env.desktop; }
+    $("flashDesktopOnly").style.display = K5.isMobile ? "inline" : "none";
   }
-});
+  // SSID select is language-independent, build once
+  (function(){ var s = $("ssid"); for (var i = 0; i <= 15; i++){ var o = document.createElement("option"); o.value = i; o.textContent = i; s.appendChild(o); } s.value = 0; })();
 
-// ---- step 6: configure ----
-$("btnGps").addEventListener("click", function(){
-  if(!navigator.geolocation){ setSt("stSave","No geolocation in this browser.","err"); return; }
-  setSt("stSave","Getting GPS…");
-  navigator.geolocation.getCurrentPosition(function(p){
-    $("pos").dataset.lat=p.coords.latitude; $("pos").dataset.lon=p.coords.longitude;
-    var la=Math.abs(p.coords.latitude).toFixed(4)+(p.coords.latitude<0?"S":"N");
-    var lo=Math.abs(p.coords.longitude).toFixed(4)+(p.coords.longitude<0?"W":"E");
-    $("pos").value=la+"  "+lo+"  (±"+Math.round(p.coords.accuracy)+" m)";
-    setSt("stSave","Position captured.","ok");
-  }, function(){ setSt("stSave","Could not get GPS. Move outdoors and retry.","err"); },
-     {enableHighAccuracy:true,timeout:20000,maximumAge:0});
-});
+  function rebuildSelects(){
+    var S = D().install;
+    var iv = $("intv"); var ivVal = iv.value || "10"; iv.innerHTML = "";
+    [0,10,15,30,60].forEach(function(v){ var o = document.createElement("option"); o.value = v; o.textContent = (v === 0) ? S.off : (v + " " + S.min); iv.appendChild(o); });
+    iv.value = ivVal;
+    var ap = $("aprson"); var apVal = ap.value || "1"; ap.innerHTML = "";
+    [["1", S.on],["0", S.off]].forEach(function(p){ var o = document.createElement("option"); o.value = p[0]; o.textContent = p[1]; ap.appendChild(o); });
+    ap.value = apVal;
+    if (!$("pos").value) $("pos").placeholder = S.posPlaceholder;
+  }
+  onLang(function(){ refreshEnv(); rebuildSelects(); });
 
-function cleanCall(s, max){
-  s=(s||"").toUpperCase(); var out="";
-  for(var i=0;i<s.length && out.length<max;i++){ var c=s[i];
-    if((c>='0'&&c<='9')||(c>='A'&&c<='Z')||(c==='-'&&max>6)) out+=c; }
-  return out;
-}
-$("btnSave").addEventListener("click", async function(){
-  if(!radio) return;
-  var call=cleanCall($("call").value,6);
-  if(call.length<3){ setSt("stSave","Enter a valid callsign first.","err"); return; }
-  var ssid=parseInt($("ssid").value,10)&0x0F;
-  var intv=parseInt($("intv").value,10)&0xFF;
-  var on=parseInt($("aprson").value,10)?1:0;
-  var msgto=cleanCall($("msgto").value,9);
-  var lat=$("pos").dataset.lat, lon=$("pos").dataset.lon;
-  var latU=lat!==undefined?Math.round(parseFloat(lat)*1e6):0;
-  var lonU=lon!==undefined?Math.round(parseFloat(lon)*1e6):0;
+  activate("s1");
 
-  // Region A @0x0E30 (16B): ON, INTV, SSID, CALL[7], LAT int32, pad
-  var A=new Uint8Array(16); A.fill(0xFF);
-  A[0]=on; A[1]=intv; A[2]=ssid;
-  for(var i=0;i<7;i++) A[3+i]=(i<call.length)?call.charCodeAt(i):0;
-  new DataView(A.buffer).setInt32(10, latU, true);
-  // Region B @0x0F20 (16B): LON int32, MSGTO[10], pad
-  var B=new Uint8Array(16); B.fill(0xFF);
-  new DataView(B.buffer).setInt32(0, lonU, true);
-  for(var j=0;j<10;j++) B[4+j]=(j<msgto.length)?msgto.charCodeAt(j):0;
+  $("btnConnect").addEventListener("click", async function(){
+    var S = D().install.st;
+    var t = K5.pickTransport();
+    if (!t){ st("stConnect", S.noSerial, "err"); return; }
+    st("stConnect", S.selectAdapter);
+    try {
+      await t.connect();
+      radio = new K5.Radio(t);
+      var ver = await radio.hello();
+      if (!ver){ st("stConnect", S.noAnswer, "err"); return; }
+      st("stConnect", S.connected(ver), "ok");
+      stepState("s1","done"); activate("s2"); $("btnBackup").disabled = false;
+    } catch(e){
+      var m = (e && e.message) ? e.message : String(e);
+      st("stConnect", S.connFailed, "err");
+      if (!/No device selected|cancel/i.test(m)){ $("raw").value = (e && e.name ? e.name + "\n" : "") + m; $("raw").style.display = "block"; }
+    }
+  });
 
-  $("btnSave").disabled=true; setSt("stSave","Writing settings…");
-  try {
-    await radio.writeCfg(0x0E30, A);
-    await radio.writeCfg(0x0F20, B);
-    await radio.reboot();
-    setSt("stSave","Saved "+call+(ssid?"-"+ssid:"")+". Radio rebooted with your settings.","ok");
-    stepState("s6","done"); activate("s7");
-  } catch(e){ setSt("stSave","Write failed: "+(e&&e.message?e.message:e),"err"); $("btnSave").disabled=false; }
-});
+  function download(name, bytes){
+    var url = URL.createObjectURL(new Blob([bytes], {type:"application/octet-stream"}));
+    var a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click();
+    a.remove(); setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+  $("btnBackup").addEventListener("click", async function(){
+    var S = D().install.st;
+    if (!radio) return;
+    $("btnBackup").disabled = true; st("stBackup", S.reading);
+    try {
+      var full = await radio.dumpEeprom(0x0000, 0x2000, function(d,t){ bar("barBackup", d, t); });
+      var stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,"");
+      download("uvk5-eeprom-" + stamp + ".bin", full);
+      download("uvk5-calibration-" + stamp + ".bin", full.slice(0x1E00, 0x2000));
+      backedUp = true;
+      st("stBackup", S.backupOk, "ok");
+      stepState("s2","done"); activate("s3"); $("btnWipe").disabled = false;
+    } catch(e){ st("stBackup", S.backupFail(e && e.message ? e.message : e), "err"); $("btnBackup").disabled = false; }
+  });
+
+  $("btnWipe").addEventListener("click", async function(){
+    var S = D().install.st;
+    if (!radio) return;
+    if (!backedUp && !confirm(S.wipeConfirm)) return;
+    $("btnWipe").disabled = true; st("stWipe", S.wiping);
+    try {
+      await radio.wipe(0x0000, 0x1E00, function(d,t){ bar("barWipe", d, t); });
+      var chk = await radio.readCfg(0x0000, 8);
+      var ok = Array.prototype.every.call(chk, function(b){ return b === 0xFF; });
+      if (!ok) throw new Error(S.verifyFail);
+      st("stWipe", S.wipeOk, "ok");
+      stepState("s3","done"); activate("s4"); $("btnFlashMode").disabled = false;
+    } catch(e){ st("stWipe", S.wipeFail(e && e.message ? e.message : e), "err"); $("btnWipe").disabled = false; }
+  });
+
+  $("btnFlashMode").addEventListener("click", async function(){
+    var S = D().install.st;
+    if (!radio) return;
+    st("stFlashMode", S.listening);
+    try {
+      var b = await radio.waitBeacon(6000);
+      if (!b){ st("stFlashMode", S.noBeacon, "err"); return; }
+      st("stFlashMode", S.flashModeOk(b), "ok");
+      stepState("s4","done"); activate("s5");
+      if (K5.isMobile){ st("stFlash", S.flashDesktopOnly, "err"); }
+      else { $("btnFlash").disabled = false; }
+    } catch(e){ st("stFlashMode", S.genericErr(e && e.message ? e.message : e), "err"); }
+  });
+
+  $("btnFlash").addEventListener("click", async function(){
+    var S = D().install.st;
+    if (!radio || K5.isMobile) return;
+    $("btnFlash").disabled = true; st("stFlash", S.downloading);
+    try {
+      var resp = await fetch(FW_URL, {cache:"no-store"});
+      if (!resp.ok) throw new Error(S.cannotLoad(FW_URL, resp.status));
+      var fw = new Uint8Array(await resp.arrayBuffer());
+      st("stFlash", S.flashing(fw.length));
+      await radio.flash(fw, FW_VERSION, function(d,t){ bar("barFlash", d, t); st("stFlash", S.flashingChunk(d, t)); });
+      st("stFlash", S.flashComplete, "ok");
+      stepState("s5","done"); activate("s6");
+      setTimeout(async function(){
+        try { var v = await radio.hello(); if (v){ st("stSave", S.newFwRunning(v), "ok"); } } catch(e){}
+      }, 2500);
+      $("btnSave").disabled = false;
+    } catch(e){
+      st("stFlash", S.flashFail(e && e.message ? e.message : e), "err");
+      $("btnFlash").disabled = false;
+    }
+  });
+
+  $("btnGps").addEventListener("click", function(){
+    var S = D().install.st;
+    if (!navigator.geolocation){ st("stSave", S.noGeo, "err"); return; }
+    st("stSave", S.gettingGps);
+    navigator.geolocation.getCurrentPosition(function(p){
+      $("pos").dataset.lat = p.coords.latitude; $("pos").dataset.lon = p.coords.longitude;
+      var la = Math.abs(p.coords.latitude).toFixed(4) + (p.coords.latitude < 0 ? "S" : "N");
+      var lo = Math.abs(p.coords.longitude).toFixed(4) + (p.coords.longitude < 0 ? "W" : "E");
+      $("pos").value = la + "  " + lo + "  (±" + Math.round(p.coords.accuracy) + " m)";
+      st("stSave", S.posCaptured, "ok");
+    }, function(){ st("stSave", S.gpsFail, "err"); },
+       {enableHighAccuracy:true, timeout:20000, maximumAge:0});
+  });
+
+  function cleanCall(s, max){
+    s = (s || "").toUpperCase(); var out = "";
+    for (var i = 0; i < s.length && out.length < max; i++){ var c = s[i];
+      if ((c >= "0" && c <= "9") || (c >= "A" && c <= "Z") || (c === "-" && max > 6)) out += c; }
+    return out;
+  }
+  $("btnSave").addEventListener("click", async function(){
+    var S = D().install.st;
+    if (!radio) return;
+    var call = cleanCall($("call").value, 6);
+    if (call.length < 3){ st("stSave", S.badCall, "err"); return; }
+    var ssid = parseInt($("ssid").value, 10) & 0x0F;
+    var intv = parseInt($("intv").value, 10) & 0xFF;
+    var on = parseInt($("aprson").value, 10) ? 1 : 0;
+    var msgto = cleanCall($("msgto").value, 9);
+    var lat = $("pos").dataset.lat, lon = $("pos").dataset.lon;
+    var latU = lat !== undefined ? Math.round(parseFloat(lat) * 1e6) : 0;
+    var lonU = lon !== undefined ? Math.round(parseFloat(lon) * 1e6) : 0;
+
+    var A = new Uint8Array(16); A.fill(0xFF);
+    A[0] = on; A[1] = intv; A[2] = ssid;
+    for (var i = 0; i < 7; i++) A[3+i] = (i < call.length) ? call.charCodeAt(i) : 0;
+    new DataView(A.buffer).setInt32(10, latU, true);
+    var B = new Uint8Array(16); B.fill(0xFF);
+    new DataView(B.buffer).setInt32(0, lonU, true);
+    for (var jj = 0; jj < 10; jj++) B[4+jj] = (jj < msgto.length) ? msgto.charCodeAt(jj) : 0;
+
+    $("btnSave").disabled = true; st("stSave", S.writing);
+    try {
+      await radio.writeCfg(0x0E30, A);
+      await radio.writeCfg(0x0F20, B);
+      await radio.reboot();
+      st("stSave", S.saved(call + (ssid ? "-" + ssid : "")), "ok");
+      stepState("s6","done"); activate("s7");
+    } catch(e){ st("stSave", S.writeFail(e && e.message ? e.message : e), "err"); $("btnSave").disabled = false; }
+  });
+})();
+
+/* ======================= BEACON logic ======================= */
+(function(){
+  var transport = null;
+  var isMobile = K5.isMobile;
+  function cmdBeaconAt(latU, lonU){ var d = new Uint8Array(8), dv = new DataView(d.buffer); dv.setInt32(0, latU, true); dv.setInt32(4, lonU, true); return K5.frameCommand(0x0704, d); }
+
+  var connectBtn = $("bxConnect"), beaconBtn = $("bxBeacon");
+  var connStatus = $("bxConnStatus"), txStatus = $("bxTxStatus");
+  var fix = $("bxFix"), coordsEl = $("bxCoords"), metaEl = $("bxMeta");
+  var showAllLink = $("bxShowAll");
+  var trackBtn = $("bxTrack"), trackStatus = $("bxTrackStatus"), ivlInput = $("bxIvl");
+  var smartBox = $("bxSmart"), ivlLabel = $("bxIvlLabel"), ivlUnit = $("bxIvlUnit");
+
+  function setConn(msg, cls){ connStatus.textContent = msg; connStatus.className = "status " + (cls || ""); }
+  function setTx(msg, cls){ txStatus.textContent = msg; txStatus.className = "status " + (cls || ""); }
+  function setTrack(msg, cls){ trackStatus.textContent = msg; trackStatus.className = "status " + (cls || ""); }
+
+  var connected = false, tracking = false;
+  function relabel(){
+    var B = D().beacon;
+    connectBtn.textContent = connected ? B.connected : B.connect;
+    trackBtn.textContent = tracking ? B.trackStop : B.trackStart;
+    if (smartBox.checked){ ivlLabel.textContent = B.fastRate; ivlUnit.textContent = B.unitAtSpeed; }
+    else { ivlLabel.textContent = B.every; ivlUnit.textContent = B.unitS; }
+  }
+  onLang(relabel);
+
+  async function tryConnect(makeTransport, preDevice){
+    var B = D().beacon.st;
+    transport = makeTransport();
+    if (!preDevice) setConn(B.chooseAdapter);
+    await transport.connect(preDevice);
+    connected = true;
+    setConn(B.connectedVia(transport.name), "ok");
+    connectBtn.classList.add("connected");
+    connectBtn.textContent = D().beacon.connected;
+    beaconBtn.disabled = false;
+    trackBtn.disabled = false;
+  }
+
+  connectBtn.addEventListener("click", async function(){
+    var B = D().beacon.st;
+    try {
+      if (!isMobile && ("serial" in navigator)) await tryConnect(K5.makeWebSerial);
+      else if ("usb" in navigator)              await tryConnect(function(){ return K5.makeWebUsb(false); });
+      else if ("serial" in navigator)           await tryConnect(K5.makeWebSerial);
+      else { setConn(B.neither, "err"); }
+    } catch(e){
+      var msg = (e && e.message) ? e.message : String(e);
+      if (/No device selected|cancell/i.test(msg)) setConn(B.noPick, "err");
+      else setConn(B.connFailDetail, "err");
+      var box = $("bxRawErr"); box.value = (e && e.name ? e.name + "\n" : "") + msg; box.style.display = "block";
+      transport = null; connected = false;
+      showAllLink.style.display = ("usb" in navigator) ? "inline" : "none";
+    }
+  });
+
+  showAllLink.addEventListener("click", async function(ev){
+    ev.preventDefault();
+    try { await tryConnect(function(){ return K5.makeWebUsb(true); }); showAllLink.style.display = "none"; }
+    catch(e){ setConn(D().beacon.st.stillFailed((e && e.message) ? e.message : e), "err"); }
+  });
+
+  async function sendFix(pos){
+    var lat = pos.coords.latitude, lon = pos.coords.longitude, acc = Math.round(pos.coords.accuracy);
+    await transport.send(cmdBeaconAt(Math.round(lat * 1e6), Math.round(lon * 1e6)));
+    coordsEl.textContent = Math.abs(lat).toFixed(4) + (lat < 0 ? "S" : "N") + "  " + Math.abs(lon).toFixed(4) + (lon < 0 ? "W" : "E");
+    metaEl.textContent = "±" + acc + " m  ·  " + new Date().toLocaleTimeString();
+    fix.classList.add("on");
+  }
+  function geoErr(setter){
+    return function(err){
+      var B = D().beacon.st;
+      if (err && err.code === 1) setter(B.permDenied, "err");
+      else if (err && err.code === 3) setter(B.gpsTimeout, "err");
+      else setter(B.locFail, "err");
+    };
+  }
+
+  beaconBtn.addEventListener("click", function(){
+    var B = D().beacon.st;
+    if (!transport){ setTx(B.connectFirst, "err"); return; }
+    if (!navigator.geolocation){ setTx(B.noGeo, "err"); return; }
+    setTx(B.waitingGps); beaconBtn.disabled = true;
+    navigator.geolocation.getCurrentPosition(async function(pos){
+      try { await sendFix(pos); setTx(D().beacon.st.beaconSent, "ok"); }
+      catch(e){ setTx(D().beacon.st.sendFail(e && e.message ? e.message : e), "err"); }
+      beaconBtn.disabled = false;
+    }, function(e){ beaconBtn.disabled = false; geoErr(setTx)(e); },
+       {enableHighAccuracy:true, timeout:20000, maximumAge:0});
+  });
+
+  // ---- Live tracking ----
+  var watchId = null, timerId = null, wakeLock = null;
+  var lastPos = null, sentCount = 0, sending = false, lastBeaconMs = 0, lastHeading = null;
+  var SB = { slowSpeed:5, fastSpeed:90, turnMin:27, turnSlope:255, turnTime:15 };
+
+  smartBox.addEventListener("change", relabel);
+
+  async function acquireWakeLock(){ try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch(e){} }
+  function releaseWakeLock(){ try { if (wakeLock) wakeLock.release(); } catch(e){} wakeLock = null; }
+  document.addEventListener("visibilitychange", function(){
+    if (tracking && document.visibilityState === "visible" && !wakeLock) acquireWakeLock();
+  });
+
+  function maybeBeacon(){
+    if (!tracking || !lastPos || sending) return;
+    var now = Date.now(), elapsed = (now - lastBeaconMs) / 1000;
+    var fast = Math.max(30, Math.min(1800, parseInt(ivlInput.value, 10) || 60));
+    var reason = null;
+    if (!smartBox.checked){ if (elapsed >= fast) reason = "fixed"; }
+    else {
+      var spd = (lastPos.coords.speed != null && lastPos.coords.speed >= 0) ? lastPos.coords.speed * 3.6 : 0;
+      var slow = Math.min(1800, fast * 10), rate;
+      if (spd < SB.slowSpeed) rate = slow;
+      else if (spd > SB.fastSpeed) rate = fast;
+      else rate = Math.max(fast, Math.min(slow, fast * SB.fastSpeed / spd));
+      var hd = lastPos.coords.heading;
+      if (hd != null && lastHeading != null && elapsed > SB.turnTime && spd >= SB.slowSpeed){
+        var dh = Math.abs(hd - lastHeading); if (dh > 180) dh = 360 - dh;
+        var thresh = SB.turnMin + SB.turnSlope / Math.max(spd, 1);
+        if (dh > thresh) reason = "turn";
+      }
+      if (elapsed >= rate) reason = "time";
+      window._sbInfo = Math.round(spd) + " km/h, ~" + Math.round(rate) + "s";
+    }
+    if (reason) doBeacon(reason);
+  }
+  async function doBeacon(reason){
+    sending = true;
+    try {
+      await sendFix(lastPos);
+      lastBeaconMs = Date.now();
+      lastHeading = (lastPos.coords.heading != null) ? lastPos.coords.heading : lastHeading;
+      sentCount++;
+      setTrack(D().beacon.st.tracking(sentCount, reason, (smartBox.checked && window._sbInfo ? ", " + window._sbInfo : "")), "ok");
+    } catch(e){ setTrack(D().beacon.st.trackSendFail(e && e.message ? e.message : e), "err"); stopTracking(); }
+    sending = false;
+  }
+  function startTracking(){
+    var B = D().beacon.st;
+    if (!transport){ setTrack(B.connectFirst, "err"); return; }
+    if (!navigator.geolocation){ setTrack(B.noGeo, "err"); return; }
+    tracking = true; sentCount = 0; lastPos = null; lastBeaconMs = 0; lastHeading = null;
+    trackBtn.textContent = D().beacon.trackStop;
+    trackBtn.style.background = "var(--warn)"; trackBtn.style.color = "#fff";
+    beaconBtn.disabled = true; ivlInput.disabled = true; smartBox.disabled = true;
+    setTrack(B.acquiring);
+    acquireWakeLock();
+    watchId = navigator.geolocation.watchPosition(function(pos){ lastPos = pos; maybeBeacon(); }, geoErr(setTrack),
+      {enableHighAccuracy:true, timeout:30000, maximumAge:5000});
+    timerId = setInterval(maybeBeacon, 3000);
+  }
+  function stopTracking(){
+    tracking = false;
+    if (watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; }
+    if (timerId !== null){ clearInterval(timerId); timerId = null; }
+    releaseWakeLock();
+    trackBtn.textContent = D().beacon.trackStart;
+    trackBtn.style.background = "var(--ok)"; trackBtn.style.color = "#04120a";
+    ivlInput.disabled = false; smartBox.disabled = false; beaconBtn.disabled = !transport;
+  }
+  trackBtn.addEventListener("click", function(){ tracking ? stopTracking() : startTracking(); });
+
+  // auto-reconnect on load to an already-permitted adapter (mobile WebUSB)
+  if (isMobile && ("usb" in navigator)){
+    navigator.usb.getDevices().then(function(list){
+      for (var i = 0; i < list.length; i++){
+        var v = list[i].vendorId;
+        if (v === 0x1A86 || v === 0x10C4 || v === 0x0403 || v === 0x067B){
+          tryConnect(function(){ return K5.makeWebUsb(false); }, list[i]).catch(function(){});
+          return;
+        }
+      }
+    }).catch(function(){});
+  }
+  // up-front support hint
+  if (!("serial" in navigator) && !("usb" in navigator)){
+    setConn(K5.isIOS ? D().beacon.st.iosHint : D().beacon.st.noWebSerial, "err");
+  } else if (isMobile && !("usb" in navigator)){
+    setConn(D().beacon.st.androidNoUsb, "err");
+  }
+})();
+
+/* ======================= CODE tool logic ======================= */
+(function(){
+  var CS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -./?!@:,'";
+  var btn = $("git"), durum = $("cDurum"), panel = $("cPanel"), kodEl = $("cKod"), metaEl = $("cMeta");
+  var lastState = null;
+
+  function relabelSteps(){
+    var C = D().code;
+    var ol = $("cSteps"); ol.innerHTML = "";
+    for (var j = 0; j < C.steps.length; j++){ var li = document.createElement("li"); li.innerHTML = C.steps[j]; ol.appendChild(li); }
+    if (!btn.disabled)
+      btn.textContent = (lastState === "done") ? C.refreshBtn : (lastState === "err") ? C.retryBtn : C.getBtn;
+  }
+  onLang(relabelSteps);
+
+  function kodYap(lat, lon){
+    var la = Math.round((lat + 90) * 10000), lo = Math.round((lon + 180) * 10000);
+    if (la < 0 || la > 1800000 || lo < 0 || lo > 3600000) return null;
+    var ds = String(la).padStart(7, "0") + String(lo).padStart(7, "0");
+    var sum = 0; for (var i = 0; i < 14; i++) sum += (i + 1) * Number(ds[i]);
+    return ds + String(sum % 10);
+  }
+  function goster(pos){
+    var C = D().code;
+    var lat = pos.coords.latitude, lon = pos.coords.longitude, acc = Math.round(pos.coords.accuracy);
+    var kod = kodYap(lat, lon);
+    btn.disabled = false; lastState = "done"; btn.textContent = C.refreshBtn;
+    if (!kod){ durum.className = "status err"; durum.textContent = C.outOfRange; return; }
+    durum.className = "status"; durum.textContent = "";
+    kodEl.textContent = kod.slice(0,5) + " " + kod.slice(5,10) + " " + kod.slice(10,15);
+    metaEl.textContent = lat.toFixed(4) + "°  " + lon.toFixed(4) + "°  (±" + acc + " m)";
+    if (acc > 100){ durum.className = "status err"; durum.textContent = C.lowAcc(acc); }
+    panel.classList.add("on");
+  }
+  function hata(e){
+    var C = D().code;
+    btn.disabled = false; lastState = "err"; btn.textContent = C.retryBtn;
+    durum.className = "status err";
+    durum.textContent = (e && e.code === 1) ? C.denied : (e && e.code === 3) ? C.timeout : C.failed;
+  }
+  btn.addEventListener("click", function(){
+    var C = D().code;
+    if (!navigator.geolocation){ durum.className = "status err"; durum.textContent = C.noGeo; return; }
+    btn.disabled = true; btn.textContent = C.searchingBtn;
+    durum.className = "status"; durum.textContent = C.waiting;
+    navigator.geolocation.getCurrentPosition(goster, hata, {enableHighAccuracy:true, timeout:20000, maximumAge:0});
+  });
+
+  function metinKodla(girisId, panelId, kodId, metaId){
+    var giris = $(girisId), pan = $(panelId), kodOut = $(kodId), metaOut = $(metaId);
+    giris.addEventListener("input", function(){
+      var t = giris.value.toUpperCase(), pairs = [], temiz = "", atlandi = false;
+      for (var idx = 0; idx < t.length; idx++){
+        var i = CS.indexOf(t[idx]);
+        if (i < 0){ atlandi = true; continue; }
+        pairs.push(String(i).padStart(2, "0")); temiz += t[idx];
+      }
+      if (pairs.length === 0){ pan.classList.remove("on"); return; }
+      kodOut.textContent = pairs.join(" ");
+      metaOut.textContent = temiz + (atlandi ? D().code.skipped : "");
+      pan.classList.add("on");
+    });
+  }
+  metinKodla("cCagri", "cCagriPanel", "cCagriKod", "cCagriMeta");
+  metinKodla("cMesaj", "cMesajPanel", "cMesajKod", "cMesajMeta");
+})();
+
+/* ======================= boot ======================= */
+routeFromHash();
+applyLang();
 </script>
 </body>
 </html>
