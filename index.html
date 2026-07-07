@@ -66,9 +66,12 @@
     <div class="meta" id="meta"></div>
   </section>
 
-  <div style="display:flex;align-items:center;gap:.6rem;border-top:1px solid var(--line);padding-top:1.1rem">
-    <label style="font:600 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Every
-      <input id="ivl" type="number" min="30" max="1800" value="60" style="width:4.5rem;margin-left:.4rem;font:500 1rem ui-monospace,Menlo,monospace;color:var(--ink);background:var(--field-bg);border:1px solid var(--line);border-radius:6px;padding:.4rem .5rem"> s
+  <div style="display:flex;flex-direction:column;gap:.7rem;border-top:1px solid var(--line);padding-top:1.1rem">
+    <label style="font:600 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)"><span id="ivlLabel">Every</span>
+      <input id="ivl" type="number" min="30" max="1800" value="60" style="width:4.5rem;margin:0 .4rem;font:500 1rem ui-monospace,Menlo,monospace;color:var(--ink);background:var(--field-bg);border:1px solid var(--line);border-radius:6px;padding:.4rem .5rem"><span id="ivlUnit">s</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:.5rem;font:600 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">
+      <input id="smart" type="checkbox" checked style="width:1.1rem;height:1.1rem"> Smart beaconing (speed &amp; turns)
     </label>
   </div>
   <button id="track" class="big" type="button" disabled style="background:var(--ok);color:#04120a">Start Live Tracking</button>
@@ -293,55 +296,103 @@ var trackStatus = document.getElementById("trackStatus");
 var ivlInput    = document.getElementById("ivl");
 function setTrack(msg, cls) { trackStatus.textContent = msg; trackStatus.className = "status " + (cls || ""); }
 
-var tracking = false, watchId = null, timerId = null, wakeLock = null, lastPos = null, sentCount = 0;
+var smartBox = document.getElementById("smart");
+var ivlLabel = document.getElementById("ivlLabel");
+var ivlUnit  = document.getElementById("ivlUnit");
+
+var tracking = false, watchId = null, timerId = null, wakeLock = null;
+var lastPos = null, sentCount = 0, sending = false;
+var lastBeaconMs = 0, lastHeading = null;
+
+// SmartBeaconing (KA9MVA/KD7TA) defaults; "fast rate" = the interval field.
+var SB = { slowSpeed: 5, fastSpeed: 90, turnMin: 27, turnSlope: 255, turnTime: 15 };
+
+function relabel() {
+  if (smartBox.checked) { ivlLabel.textContent = "Fast rate"; ivlUnit.textContent = "s (@ speed)"; }
+  else                  { ivlLabel.textContent = "Every";     ivlUnit.textContent = "s"; }
+}
+smartBox.addEventListener("change", relabel);
+relabel();
 
 async function acquireWakeLock() {
   try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
 }
 function releaseWakeLock() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
-// re-acquire if the OS dropped it when the tab was briefly hidden
 document.addEventListener("visibilitychange", function () {
   if (tracking && document.visibilityState === "visible" && !wakeLock) acquireWakeLock();
 });
 
-async function tick() {
-  if (!tracking || !lastPos) return;
+// decide whether to beacon now, per fixed-interval or SmartBeaconing
+function maybeBeacon() {
+  if (!tracking || !lastPos || sending) return;
+  var now = Date.now();
+  var elapsed = (now - lastBeaconMs) / 1000;
+  var fast = Math.max(30, Math.min(1800, parseInt(ivlInput.value, 10) || 60));
+  var reason = null;
+
+  if (!smartBox.checked) {
+    if (elapsed >= fast) reason = "fixed";
+  } else {
+    var spd = (lastPos.coords.speed != null && lastPos.coords.speed >= 0) ? lastPos.coords.speed * 3.6 : 0; // km/h
+    var slow = Math.min(1800, fast * 10);
+    var rate;
+    if (spd < SB.slowSpeed) rate = slow;
+    else if (spd > SB.fastSpeed) rate = fast;
+    else rate = Math.max(fast, Math.min(slow, fast * SB.fastSpeed / spd));
+    // corner pegging: beacon on a significant heading change
+    var hd = lastPos.coords.heading;
+    if (hd != null && lastHeading != null && elapsed > SB.turnTime && spd >= SB.slowSpeed) {
+      var dh = Math.abs(hd - lastHeading); if (dh > 180) dh = 360 - dh;
+      var thresh = SB.turnMin + SB.turnSlope / Math.max(spd, 1);
+      if (dh > thresh) reason = "turn";
+    }
+    if (elapsed >= rate) reason = "time";
+    window._sbInfo = Math.round(spd) + " km/h, next ~" + Math.round(rate) + "s";
+  }
+  if (reason) doBeacon(reason);
+}
+
+async function doBeacon(reason) {
+  sending = true;
   try {
     await sendFix(lastPos);
+    lastBeaconMs = Date.now();
+    lastHeading = (lastPos.coords.heading != null) ? lastPos.coords.heading : lastHeading;
     sentCount++;
-    setTrack("Tracking — " + sentCount + " sent, last " + new Date().toLocaleTimeString() +
-             ". Keep the screen on.", "ok");
+    setTrack("Tracking — " + sentCount + " sent (" + reason + ")" +
+             (smartBox.checked && window._sbInfo ? ", " + window._sbInfo : "") +
+             ". Keep screen on.", "ok");
   } catch (e) {
     setTrack("Send failed (" + (e && e.message ? e.message : e) + "). Tracking stopped.", "err");
     stopTracking();
   }
+  sending = false;
 }
 
 function startTracking() {
   if (!transport) { setTrack("Connect the radio first.", "err"); return; }
   if (!navigator.geolocation) { setTrack("This browser has no geolocation.", "err"); return; }
-  var ivl = Math.max(30, Math.min(1800, parseInt(ivlInput.value, 10) || 60));
-  tracking = true; sentCount = 0; lastPos = null;
+  tracking = true; sentCount = 0; lastPos = null; lastBeaconMs = 0; lastHeading = null;
   trackBtn.textContent = "Stop Live Tracking";
   trackBtn.style.background = "var(--warn)"; trackBtn.style.color = "#fff";
-  beaconBtn.disabled = true; ivlInput.disabled = true;
+  beaconBtn.disabled = true; ivlInput.disabled = true; smartBox.disabled = true;
   setTrack("Acquiring GPS…");
   acquireWakeLock();
   watchId = navigator.geolocation.watchPosition(
-    function (pos) { lastPos = pos; if (sentCount === 0) tick(); },   // first fix -> beacon at once
+    function (pos) { lastPos = pos; maybeBeacon(); },   // responsive to turns/first fix
     geoErr(setTrack),
-    { enableHighAccuracy: true, timeout: 30000, maximumAge: 15000 });
-  timerId = setInterval(tick, ivl * 1000);
+    { enableHighAccuracy: true, timeout: 30000, maximumAge: 5000 });
+  timerId = setInterval(maybeBeacon, 3000);            // also fire when stationary
 }
 
 function stopTracking() {
   tracking = false;
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId), watchId = null;
-  if (timerId !== null) clearInterval(timerId), timerId = null;
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  if (timerId !== null) { clearInterval(timerId); timerId = null; }
   releaseWakeLock();
   trackBtn.textContent = "Start Live Tracking";
   trackBtn.style.background = "var(--ok)"; trackBtn.style.color = "#04120a";
-  ivlInput.disabled = false;
+  ivlInput.disabled = false; smartBox.disabled = false;
   beaconBtn.disabled = !transport;
 }
 
