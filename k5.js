@@ -317,9 +317,12 @@ var K5 = (function () {
   Radio.prototype.setBandwidth  = rcSet(0x0B04);
   Radio.prototype.setModulation = rcSet(0x0B05);
 
-  // poll one display frame: send 0x0A03, read the raw push 0xAB 0xED + 1024
-  // bytes (paged 128x64 framebuffer; NOT the AB CD/CRC envelope). Returns the
-  // 1024-byte buffer or null.
+  // WITHDRAWN: display mirror (0x0A03). The firmware pushed the raw 1024-byte
+  // framebuffer from inside its IRQ-disabled command handler, blocking every
+  // interrupt for ~270 ms per frame at 38400 baud - polling it a few times a
+  // second shredded the radio's APRS FSK receive capture. The command no longer
+  // exists in the firmware; kept here commented out for reference only.
+  /*
   Radio.prototype.pollScreen = function (timeoutMs) {
     var self = this;
     return this._run(async function () {
@@ -339,6 +342,7 @@ var K5 = (function () {
       }
     });
   };
+  */
 
   // read a whole EEPROM range into one Uint8Array (default 0x0000..0x2000)
   Radio.prototype.dumpEeprom = async function (start, end, onProgress) {

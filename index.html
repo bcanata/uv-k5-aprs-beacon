@@ -131,6 +131,7 @@
   .bub{max-width:82%;padding:.45rem .7rem;border-radius:11px;font-size:.86rem;line-height:1.35;word-break:break-word;}
   .bub .who{display:block;font:600 .58rem/1 ui-monospace,Menlo,monospace;letter-spacing:.04em;opacity:.7;margin-bottom:.2rem;}
   .bub .tm{display:block;font:400 .55rem/1 ui-monospace,Menlo,monospace;opacity:.5;margin-top:.25rem;text-align:right;}
+  .bub .ack{margin-left:.35rem;opacity:.95;font-size:.7rem;}
   .bub.in{align-self:flex-start;background:var(--field-bg);border:1px solid var(--line);}
   .bub.out{align-self:flex-end;background:var(--accent);color:var(--accent-ink);}
   .chat .empty{margin:auto;color:var(--muted);font-size:.85rem;}
@@ -382,7 +383,8 @@
     <p class="status" id="rcStatus"></p>
 
     <div id="rcPanel" style="display:none">
-      <div class="rc-lcd"><canvas id="rcScreen" width="128" height="64"></canvas></div>
+      <!-- display mirror withdrawn (blocked the radio's interrupts and broke APRS RX):
+      <div class="rc-lcd"><canvas id="rcScreen" width="128" height="64"></canvas></div> -->
       <div class="rc-state" id="rcState"></div>
 
       <div class="rc-nav">
@@ -555,8 +557,9 @@ var T = {
       msgPh: "Message (max 30)", toPh: "TA1XYZ-7",
       emptyLog: "No packets yet — decoded APRS packets the radio reports will appear here.",
       emptyChat: "No messages yet. Incoming messages to your callsign show here.",
+      delivered: "Delivered — acknowledged by the receiving station",
       confirmClear: "Clear all of these? This can't be undone.",
-      fine: "Everything is stored in this browser (not the radio) and persists between visits. The log captures every decoded packet the radio reports; the chat shows messages addressed to your callsign and the ones you send. Requires the radio on 144.800 MHz with APRS RX on.",
+      fine: "Everything is stored in this browser (not the radio) and persists between visits. The log captures every decoded packet the radio reports; the chat shows messages addressed to your callsign and the ones you send — a ✓ on a sent message means the other station acknowledged it. Requires the radio on 144.800 MHz with APRS RX on.",
       st: {
         connecting: "Connecting…",
         connected: function(v){ return "Connected: " + v + " — monitoring"; },
@@ -723,14 +726,14 @@ var T = {
     },
     control: {
       h1: "Radio Control",
-      lede: "Drive the radio from your browser — live screen, virtual keypad and TX controls over USB.",
+      lede: "Drive the radio from your browser — virtual keypad, live state readout and TX controls over USB.",
       fwnote: "<b>Needs TA1JS v1.1+ firmware</b> with radio control (flash it from the Install tab). Older firmware won't answer control commands.",
       connect: "Connect Radio",
       connected: "Connected",
       up: "", down: "",
       power: "Power", bw: "BW", mod: "Mod",
       ptt: "PTT — hold to transmit",
-      fine: "The on-screen keys behave exactly like the radio's physical keys (settings save on release). PTT transmits while held — use only on frequencies you are licensed for. The screen refreshes a few times per second.",
+      fine: "The on-screen keys behave exactly like the radio's physical keys (settings save on release). PTT transmits while held — use only on frequencies you are licensed for. Frequency, RSSI and battery refresh about twice a second; the radio's own display is not mirrored (that push blocked the radio's interrupts and broke APRS reception).",
       st: {
         connecting: "Connecting…",
         connected: function(v){ return "Connected: " + v; },
@@ -806,8 +809,9 @@ var T = {
       msgPh: "Mesaj (en çok 30)", toPh: "TA1XYZ-7",
       emptyLog: "Henüz paket yok — telsizin çözdüğü APRS paketleri burada görünür.",
       emptyChat: "Henüz mesaj yok. Çağrı işaretinize gelen mesajlar burada görünür.",
+      delivered: "İletildi — karşı istasyon teyit etti",
       confirmClear: "Hepsi silinsin mi? Bu geri alınamaz.",
-      fine: "Her şey bu tarayıcıda saklanır (telsizde değil) ve ziyaretler arasında kalır. Kayıt, telsizin çözdüğü her paketi tutar; sohbet, çağrı işaretinize gelen ve gönderdiğiniz mesajları gösterir. Telsizin 144.800 MHz'de ve APRS RX açık olması gerekir.",
+      fine: "Her şey bu tarayıcıda saklanır (telsizde değil) ve ziyaretler arasında kalır. Kayıt, telsizin çözdüğü her paketi tutar; sohbet, çağrı işaretinize gelen ve gönderdiğiniz mesajları gösterir — gönderdiğiniz bir mesajın yanındaki ✓ karşı istasyonun teyit ettiği anlamına gelir. Telsizin 144.800 MHz'de ve APRS RX açık olması gerekir.",
       st: {
         connecting: "Bağlanıyor…",
         connected: function(v){ return "Bağlandı: " + v + " — izleniyor"; },
@@ -974,14 +978,14 @@ var T = {
     },
     control: {
       h1: "Telsiz Kontrolü",
-      lede: "Telsizi tarayıcından yönet — canlı ekran, sanal tuş takımı ve TX kontrolleri USB üzerinden.",
+      lede: "Telsizi tarayıcından yönet — sanal tuş takımı, canlı durum bilgisi ve TX kontrolleri USB üzerinden.",
       fwnote: "<b>TA1JS v1.1+ firmware</b> (telsiz kontrolü içeren) gerekir; önce Kurulum sekmesinden yükleyin. Eski firmware kontrol komutlarına yanıt vermez.",
       connect: "Telsizi Bağla",
       connected: "Bağlandı",
       up: "", down: "",
       power: "Güç", bw: "BG", mod: "Mod",
       ptt: "PTT — bas ve konuş",
-      fine: "Ekrandaki tuşlar telsizin gerçek tuşları gibi davranır (ayarlar bırakınca kaydedilir). PTT basılı tutuldukça yayın yapar — yalnızca lisanslı olduğunuz frekanslarda kullanın. Ekran saniyede birkaç kez yenilenir.",
+      fine: "Ekrandaki tuşlar telsizin gerçek tuşları gibi davranır (ayarlar bırakınca kaydedilir). PTT basılı tutuldukça yayın yapar — yalnızca lisanslı olduğunuz frekanslarda kullanın. Frekans, RSSI ve batarya saniyede iki kez yenilenir; telsizin kendi ekranı yansıtılmıyor (o aktarım telsizin kesmelerini bloklayıp APRS alımını bozuyordu).",
       st: {
         connecting: "Bağlanıyor…",
         connected: function(v){ return "Bağlandı: " + v; },
@@ -1559,7 +1563,7 @@ window.addEventListener("hashchange", routeFromHash);
 /* ======================= RADIO CONTROL ======================= */
 (function(){
   var radio = null, running = false, pollTimer = null, connected = false;
-  var canvas = $("rcScreen"), ctx = canvas.getContext("2d");
+  // var canvas = $("rcScreen"), ctx = canvas.getContext("2d");   // display mirror withdrawn
   var rcConnect = $("rcConnect");
   function rcSt(msg, cls){ var e = $("rcStatus"); e.textContent = msg; e.className = "status " + (cls || ""); }
 
@@ -1571,7 +1575,8 @@ window.addEventListener("hashchange", routeFromHash);
   fillSelect($("rcBw"), ["Wide","Narrow"]);
   fillSelect($("rcMod"), MOD);
 
-  // render the 1024-byte paged framebuffer (8 pages x 128 cols, bit0 = top) to the canvas
+  // WITHDRAWN with the 0x0A03 display mirror - see k5.js. Kept for reference.
+  /*
   function renderScreen(buf){
     var img = ctx.createImageData(128, 64);
     for (var page = 0; page < 8; page++){
@@ -1589,6 +1594,7 @@ window.addEventListener("hashchange", routeFromHash);
     }
     ctx.putImageData(img, 0, 0);
   }
+  */
 
   function renderState(s){
     if (!s){ $("rcState").innerHTML = ""; return; }
@@ -1611,12 +1617,12 @@ window.addEventListener("hashchange", routeFromHash);
     if (!$("view-control").classList.contains("active")){ pollTimer = setTimeout(loop, 500); return; }
     (async function(){
       try {
-        var buf = await radio.pollScreen(1200);
-        if (buf) renderScreen(buf);
+        // display mirror withdrawn - state only (a small reply frame, so the
+        // radio's interrupts stay free for APRS RX)
         var s = await radio.getState();
         if (s) renderState(s);
       } catch(e){}
-      if (running) pollTimer = setTimeout(loop, 280);
+      if (running) pollTimer = setTimeout(loop, 500);
     })();
   }
 
@@ -2012,12 +2018,27 @@ window.addEventListener("hashchange", routeFromHash);
     if(!chatArr.length){ el.innerHTML="<div class='empty'>"+esc(D().ap.emptyChat)+"</div>"; return; }
     var h="";
     chatArr.forEach(function(m){
-      h+="<div class='bub "+(m.dir==="out"?"out":"in")+"'><span class='who'>"+esc(m.dir==="out"?("→ "+m.who):m.who)+"</span>"+esc(m.text)+"<span class='tm'>"+tm(m.t)+"</span></div>";
+      // outgoing messages carry a "{nn" line number, so the far station acks
+      // them; m.ok is set when that ack comes back ("rej" = refused).
+      var mark="";
+      if(m.dir==="out"&&m.ok) mark="<span class='ack' title='"+esc(D().ap.delivered)+"'>"+(m.ok==="rej"?"✗":"✓")+"</span>";
+      h+="<div class='bub "+(m.dir==="out"?"out":"in")+"'><span class='who'>"+esc(m.dir==="out"?("→ "+m.who):m.who)+"</span>"+esc(m.text)+"<span class='tm'>"+tm(m.t)+mark+"</span></div>";
     });
     el.innerHTML=h; el.scrollTop=el.scrollHeight;
   }
   function addLog(text){ logArr.push({t:Date.now(),text:text}); if(logArr.length>500)logArr=logArr.slice(-500); save(LOG_KEY,logArr); renderLog(); }
   function addChat(dir,who,text){ chatArr.push({dir:dir,who:who,text:text,t:Date.now()}); if(chatArr.length>500)chatArr=chatArr.slice(-500); save(CHAT_KEY,chatArr); renderChat(); }
+
+  // mark the newest still-unacknowledged outgoing message to this station as
+  // delivered. The firmware assigns the "{nn" line number itself and doesn't
+  // report it back, so we match on the callsign, not the number.
+  function markDelivered(who,rejected){
+    for(var i=chatArr.length-1;i>=0;i--){
+      if(chatArr[i].dir==="out"&&(chatArr[i].who||"").toUpperCase()===who&&!chatArr[i].ok){
+        chatArr[i].ok=rejected?"rej":true; save(CHAT_KEY,chatArr); renderChat(); return;
+      }
+    }
+  }
 
   // a decoded packet line the firmware reported (without the "APRS:" prefix).
   // Messages addressed to us come through as "CALL>text"; everything else is a
@@ -2027,7 +2048,12 @@ window.addEventListener("hashchange", routeFromHash);
     var gt=line.indexOf(">");
     if(gt>0){
       var from=line.slice(0,gt);
-      if(/^[A-Z0-9]{1,6}(-[0-9]{1,2})?$/.test(from)) addChat("in",from,line.slice(gt+1));
+      if(/^[A-Z0-9]{1,6}(-[0-9]{1,2})?$/.test(from)){
+        var body=line.slice(gt+1);
+        var a=/^(ack|rej)[0-9]{1,5}$/i.exec(body.trim());
+        if(a){ markDelivered(from.toUpperCase(),a[1].toLowerCase()==="rej"); return; }  // receipt, not a message
+        addChat("in",from,body);
+      }
     }
   }
   function extract(){
