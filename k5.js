@@ -483,16 +483,24 @@ var K5 = (function () {
       pl[10] = chunkCount & 0xFF; pl[11] = (chunkCount >> 8) & 0xFF;
       pl[12] = dlen & 0xFF; pl[13] = (dlen >> 8) & 0xFF;
       pl.set(data, 16);
-      this.rx = new Uint8Array(0);
-      await this.t.send(frameRaw(pl));
-      // wait for ack 0x051A (skip interleaved beacons)
-      var ack = null, tries = 0;
-      while (tries++ < 15) {
-        var p = await this.readFrame(2000);
-        if (!p) break;
-        var id = p[0] | (p[1] << 8);
-        if (id === 0x0518) continue;         // beacon, ignore
-        ack = p; break;
+      // Re-send rather than give up. The bootloader beacons continuously while
+      // it waits, and a chunk sent into the middle of one is simply lost — most
+      // often the very first, right after the version handshake, which is why
+      // flashing "usually works after a few tries". A chunk carries its own
+      // index, so re-sending one the radio already took is harmless: it just
+      // acks it again.
+      var ack = null;
+      for (var attempt = 0; attempt < 3 && !ack; attempt++) {
+        this.rx = new Uint8Array(0);
+        await this.t.send(frameRaw(pl));
+        var tries = 0;
+        while (tries++ < 15) {
+          var p = await this.readFrame(2000);
+          if (!p) break;
+          var id = p[0] | (p[1] << 8);
+          if (id === 0x0518) continue;       // beacon, ignore
+          ack = p; break;
+        }
       }
       if (!ack) throw new Error("no ack for chunk " + n);
       if ((ack[0] | (ack[1] << 8)) !== 0x051A || ack[10] !== 0) throw new Error("chunk " + n + " failed");
