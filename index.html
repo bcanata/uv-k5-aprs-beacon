@@ -1520,11 +1520,10 @@ window.addEventListener("hashchange", routeFromHash);
     if (document.activeElement !== $("rcMod")) $("rcMod").value = s.modulation;
   }
 
-  // APRS ON is persisted at 0x0E30 byte 0: read it at connect so the paused
-  // notice shows instantly instead of after 1.2 s of unexplained black.
+  // Whether the radio is refusing the mirror, read from the APRS ON flag
+  // persisted at 0x0E30 byte 0 (so the notice is instant, not a second late).
   var mirrorPaused = false;
-  async function initMirrorNote(){
-    mirrorPaused = false;
+  async function refreshMirrorFlag(){
     try { var b = await radio.readCfg(0x0E30, 8); mirrorPaused = !!(b && b[0] === 1); } catch(e){}
     $("rcScreenNote").textContent = mirrorPaused ? D().control.screenPaused : "";
   }
@@ -1534,16 +1533,22 @@ window.addEventListener("hashchange", routeFromHash);
     if (!$("view-control").classList.contains("active")){ pollTimer = setTimeout(loop, 500); return; }
     (async function(){
       try {
-        // no frame means the firmware is refusing the mirror because APRS
-        // listening is on - say so instead of leaving a dead canvas. While
-        // paused, keep probing cheaply so turning APRS off resumes the mirror.
-        var buf = await radio.pollScreen(mirrorPaused ? 400 : 1200);
-        if (buf){ mirrorPaused = false; renderScreen(buf); $("rcScreenNote").textContent = ""; }
-        else { mirrorPaused = true; $("rcScreenNote").textContent = D().control.screenPaused; }
+        // A mirror frame is 1026 bytes - ~270 ms of pure transfer at 38400 baud,
+        // so a "cheap probe" timeout can never succeed and would keep the mirror
+        // paused forever. While paused, watch the APRS flag instead: it is a few
+        // bytes, it resumes by itself the moment APRS goes OFF, and it stops
+        // every cycle burning a doomed screen timeout.
+        if (mirrorPaused){
+          await refreshMirrorFlag();
+        } else {
+          var buf = await radio.pollScreen(1500);
+          if (buf){ renderScreen(buf); $("rcScreenNote").textContent = ""; }
+          else { mirrorPaused = true; $("rcScreenNote").textContent = D().control.screenPaused; }
+        }
         var s = await radio.getState();
         if (s) renderState(s);
       } catch(e){}
-      if (running) pollTimer = setTimeout(loop, 350);
+      if (running) pollTimer = setTimeout(loop, mirrorPaused ? 900 : 350);
     })();
   }
 
@@ -1592,7 +1597,7 @@ window.addEventListener("hashchange", routeFromHash);
       rcConnect.textContent = D().install.st.disconnect; rcConnect.classList.add("connected");
       $("rcPanel").style.display = "block";
       renderState(s0);
-      await initMirrorNote();
+      await refreshMirrorFlag();
       running = true; loop();
     } catch(e){ radio = null; }
   });
@@ -1623,7 +1628,7 @@ window.addEventListener("hashchange", routeFromHash);
       rcConnect.textContent = D().install.st.disconnect; rcConnect.classList.add("connected");
       $("rcPanel").style.display = "block";
       renderState(s);
-      await initMirrorNote();
+      await refreshMirrorFlag();
       running = true; loop();
     } catch(e){
       var m = (e && e.message) ? e.message : String(e);
