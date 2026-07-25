@@ -113,7 +113,11 @@
   input.tiny{width:4.5rem;margin:0 .4rem;display:inline;}
 
   /* ---- radio control panel ---- */
-  .rc-lcd{background:var(--lcd-bg);border:1px solid var(--lcd-frame);border-radius:10px;padding:.8rem;display:flex;justify-content:center;margin-top:1rem;}
+  .rc-lcd{background:var(--lcd-bg);border:1px solid var(--lcd-frame);border-radius:10px;padding:.8rem;display:flex;justify-content:center;margin-top:1rem;position:relative;}
+  /* the mirror-paused notice overlays the LCD itself — a dim footnote under a
+     black canvas reads as a broken page (issue #2, fourth report) */
+  #rcScreenNote{display:none;}
+  #rcScreenNote:not(:empty){display:flex;position:absolute;inset:0;margin:0;padding:1rem;align-items:center;justify-content:center;text-align:center;border-radius:10px;background:rgba(8,10,8,.85);color:#ffb020;font-size:.88rem;font-weight:600;line-height:1.5;}
   #rcScreen{width:100%;max-width:24rem;image-rendering:pixelated;aspect-ratio:128/64;background:#0d0b05;border-radius:4px;}
   .rc-state{display:grid;grid-template-columns:repeat(2,1fr);gap:.4rem .8rem;margin:.9rem 0;font:600 .78rem/1.3 ui-monospace,Menlo,monospace;color:var(--muted);}
   .rc-state b{color:var(--ink);font-weight:700;}
@@ -411,8 +415,7 @@
     <p class="status" id="rcStatus"></p>
 
     <div id="rcPanel" style="display:none">
-      <div class="rc-lcd"><canvas id="rcScreen" width="128" height="64"></canvas></div>
-      <p class="fine" id="rcScreenNote"></p>
+      <div class="rc-lcd"><canvas id="rcScreen" width="128" height="64"></canvas><p id="rcScreenNote"></p></div>
       <div class="rc-state" id="rcState"></div>
 
       <div class="rc-nav">
@@ -561,7 +564,7 @@
 
 </div>
 
-<script src="k5.js?v=8"></script>
+<script src="k5.js?v=9"></script>
 <script>
 "use strict";
 
@@ -1214,33 +1217,34 @@ window.addEventListener("hashchange", routeFromHash);
   var connected = false, tracking = false;
   function relabel(){
     var B = D().beacon;
-    connectBtn.textContent = connected ? B.connected : B.connect;
+    connectBtn.textContent = connected ? D().install.st.disconnect : B.connect;
     trackBtn.textContent = tracking ? B.trackStop : B.trackStart;
     if (smartBox.checked){ ivlLabel.textContent = B.fastRate; ivlUnit.textContent = B.unitAtSpeed; }
     else { ivlLabel.textContent = B.every; ivlUnit.textContent = B.unitS; }
   }
   onLang(relabel);
 
-  async function tryConnect(makeTransport, preDevice){
-    var B = D().beacon.st;
-    transport = makeTransport();
-    if (!preDevice) setConn(B.chooseAdapter);
-    await transport.connect(preDevice);
+  // This section used to open its own port with a private transport, which is
+  // why Web Beacon failed whenever another section held the shared connection
+  // (issue #2, third report). It now rides the page-wide session like the
+  // other sections: K5.acquire()/release(), attach on view, reset on close.
+  function applyConnected(t){
+    transport = t;
     connected = true;
-    setConn(B.connectedVia(transport.name), "ok");
+    setConn(D().beacon.st.connectedVia(t.name), "ok");
     connectBtn.classList.add("connected");
-    connectBtn.textContent = D().beacon.connected;
+    connectBtn.textContent = D().install.st.disconnect;
     beaconBtn.disabled = false;
     trackBtn.disabled = false;
   }
 
   connectBtn.addEventListener("click", async function(){
     var B = D().beacon.st;
+    if (connected){ await K5.release(); return; }   // K5.onConn below resets the UI
     try {
-      if (!isMobile && ("serial" in navigator)) await tryConnect(K5.makeWebSerial);
-      else if ("usb" in navigator)              await tryConnect(function(){ return K5.makeWebUsb(false); });
-      else if ("serial" in navigator)           await tryConnect(K5.makeWebSerial);
-      else { setConn(B.neither, "err"); }
+      var t = await K5.acquire();
+      if (!t){ setConn(B.neither, "err"); return; }
+      applyConnected(t);
     } catch(e){
       var msg = (e && e.message) ? e.message : String(e);
       if (/No device selected|cancell/i.test(msg)) setConn(B.noPick, "err");
@@ -1253,8 +1257,26 @@ window.addEventListener("hashchange", routeFromHash);
 
   showAllLink.addEventListener("click", async function(ev){
     ev.preventDefault();
-    try { await tryConnect(function(){ return K5.makeWebUsb(true); }); showAllLink.style.display = "none"; }
-    catch(e){ setConn(D().beacon.st.stillFailed((e && e.message) ? e.message : e), "err"); }
+    try {
+      var t = await K5.acquire(function(){ return K5.makeWebUsb(true); });
+      if (t){ applyConnected(t); showAllLink.style.display = "none"; }
+    } catch(e){ setConn(D().beacon.st.stillFailed((e && e.message) ? e.message : e), "err"); }
+  });
+
+  // attach to a port another section already opened...
+  onView(async function(name){
+    if (name !== "beacon" || connected || !K5.sessionOpen()) return;
+    try { var t = await K5.acquire(); if (t) applyConnected(t); } catch(e){}
+  });
+  // ...and let go of it together with the rest of the page
+  K5.onConn(function(open){
+    if (open) return;
+    if (tracking) stopTracking();
+    transport = null; connected = false;
+    connectBtn.classList.remove("connected");
+    beaconBtn.disabled = true; trackBtn.disabled = true;
+    setConn("");
+    relabel();
   });
 
   async function sendFix(pos){
@@ -1364,7 +1386,8 @@ window.addEventListener("hashchange", routeFromHash);
       for (var i = 0; i < list.length; i++){
         var v = list[i].vendorId;
         if (v === 0x1A86 || v === 0x10C4 || v === 0x0403 || v === 0x067B){
-          tryConnect(function(){ return K5.makeWebUsb(false); }, list[i]).catch(function(){});
+          K5.acquire(function(){ return K5.makeWebUsb(false); }, list[i])
+            .then(function(t){ if (t) applyConnected(t); }).catch(function(){});
           return;
         }
       }
@@ -1495,16 +1518,26 @@ window.addEventListener("hashchange", routeFromHash);
     if (document.activeElement !== $("rcMod")) $("rcMod").value = s.modulation;
   }
 
+  // APRS ON is persisted at 0x0E30 byte 0: read it at connect so the paused
+  // notice shows instantly instead of after 1.2 s of unexplained black.
+  var mirrorPaused = false;
+  async function initMirrorNote(){
+    mirrorPaused = false;
+    try { var b = await radio.readCfg(0x0E30, 8); mirrorPaused = !!(b && b[0] === 1); } catch(e){}
+    $("rcScreenNote").textContent = mirrorPaused ? D().control.screenPaused : "";
+  }
+
   function loop(){
     if (!running) return;
     if (!$("view-control").classList.contains("active")){ pollTimer = setTimeout(loop, 500); return; }
     (async function(){
       try {
         // no frame means the firmware is refusing the mirror because APRS
-        // listening is on - say so instead of leaving a dead canvas
-        var buf = await radio.pollScreen(1200);
-        if (buf){ renderScreen(buf); $("rcScreenNote").textContent = ""; }
-        else { $("rcScreenNote").textContent = D().control.screenPaused; }
+        // listening is on - say so instead of leaving a dead canvas. While
+        // paused, keep probing cheaply so turning APRS off resumes the mirror.
+        var buf = await radio.pollScreen(mirrorPaused ? 400 : 1200);
+        if (buf){ mirrorPaused = false; renderScreen(buf); $("rcScreenNote").textContent = ""; }
+        else { mirrorPaused = true; $("rcScreenNote").textContent = D().control.screenPaused; }
         var s = await radio.getState();
         if (s) renderState(s);
       } catch(e){}
@@ -1557,6 +1590,7 @@ window.addEventListener("hashchange", routeFromHash);
       rcConnect.textContent = D().install.st.disconnect; rcConnect.classList.add("connected");
       $("rcPanel").style.display = "block";
       renderState(s0);
+      await initMirrorNote();
       running = true; loop();
     } catch(e){ radio = null; }
   });
@@ -1587,6 +1621,7 @@ window.addEventListener("hashchange", routeFromHash);
       rcConnect.textContent = D().install.st.disconnect; rcConnect.classList.add("connected");
       $("rcPanel").style.display = "block";
       renderState(s);
+      await initMirrorNote();
       running = true; loop();
     } catch(e){
       var m = (e && e.message) ? e.message : String(e);

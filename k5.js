@@ -587,11 +587,14 @@ var K5 = (function () {
   }
   function onConn(fn){ connHooks.push(fn); }
   function sessionOpen(){ return !!sessionT; }
-  async function acquire(){
+  // factory/preDevice are optional: the beacon section's "show all USB
+  // devices" retry and the mobile auto-reconnect need a specific transport,
+  // but the port they open is still the one shared session.
+  async function acquire(factory, preDevice){
     if (sessionT) return sessionT;              // already connected elsewhere
-    var t = pickTransport();
+    var t = factory ? factory() : pickTransport();
     if (!t) return null;
-    await t.connect();                          // may throw; caller reports it
+    await t.connect(preDevice);                 // may throw; caller reports it
     sessionT = t;
     notifyConn();
     return sessionT;
