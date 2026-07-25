@@ -87,12 +87,13 @@ var K5 = (function () {
 
   // ---- transports: each exposes connect(preDevice), send(bytes), recv(max,timeoutMs), name ----
   function makeWebSerial() {
-    var port = null, reader = null, writer = null, pending = null;
+    var port = null, reader = null, writer = null, pending = null, closed = false;
     var TIMED_OUT = {};
     return {
       name: "Web Serial",
       isSerial: true,
       connect: async function () {
+        closed = false;
         // Reuse a port the user already granted, so the picker appears once per
         // browser rather than once per section.
         var known = [];
@@ -103,7 +104,10 @@ var K5 = (function () {
         reader = port.readable.getReader();
         pending = null;
       },
-      send: async function (bytes) { await writer.write(bytes); },
+      send: async function (bytes) {
+        if (closed) throw new Error("serial port closed");
+        await writer.write(bytes);
+      },
       // Keep ONE outstanding read() across calls. Web Streams deliver each
       // chunk to the oldest pending read(); if the timeout won the race and we
       // let read() go, the radio's reply would resolve that orphaned promise
@@ -116,15 +120,28 @@ var K5 = (function () {
           var res = await Promise.race([pending, to]);
           if (res === TIMED_OUT) return new Uint8Array(0);   // keep `pending`
           pending = null;
-          if (!res || res.done || !res.value) return new Uint8Array(0);
+          // A closed stream resolves read() instantly, forever. Returning an
+          // empty array here turned any read loop into a spin that starved the
+          // event loop and froze the tab (uv-k5-aprs-beacon#2). Throw instead,
+          // so callers break out.
+          if (!res || res.done) { closed = true; throw new Error("serial port closed"); }
+          if (!res.value) return new Uint8Array(0);
           return res.value;
         } finally { clearTimeout(timer); }
       },
       disconnect: async function () {
+        closed = true;
         try { if (reader) { await reader.cancel(); reader.releaseLock(); } } catch (e) {}
         try { if (writer) writer.releaseLock(); } catch (e) {}
-        try { if (port) await port.close(); } catch (e) {}
-        pending = null;
+        // Chrome can leave port.close() pending forever if the stream is still
+        // considered locked; never let that wedge the UI.
+        try {
+          if (port) await Promise.race([
+            port.close(),
+            new Promise(function (r) { setTimeout(r, 1500); })
+          ]);
+        } catch (e) {}
+        pending = null; reader = null; writer = null; port = null;
       }
     };
   }
@@ -581,9 +598,11 @@ var K5 = (function () {
   }
   async function release(){
     var t = sessionT;
-    sessionT = null;                            // drop it first: hooks must see closed
+    sessionT = null;
+    notifyConn();          // stop the read loops BEFORE closing the port:
+                           // they would otherwise spin on a dying stream
     if (t) { try { await t.disconnect(); } catch (e) {} }
-    notifyConn();
+    notifyConn();          // again, so late listeners still settle
   }
 
   return {

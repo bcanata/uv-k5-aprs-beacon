@@ -548,7 +548,7 @@
 
 </div>
 
-<script src="k5.js?v=7"></script>
+<script src="k5.js?v=8"></script>
 <script>
 "use strict";
 
@@ -1495,7 +1495,7 @@ window.addEventListener("hashchange", routeFromHash);
 
   $("btnConnect").addEventListener("click", async function(){
     var S = D().install.st;
-    if (K5.sessionOpen()){ await K5.release(); st("stConnect", S.released, ""); return; }
+    if (radio){ await K5.release(); st("stConnect", S.released, ""); return; }
     st("stConnect", S.selectAdapter);
     var t = null;
     try {
@@ -2023,7 +2023,7 @@ window.addEventListener("hashchange", routeFromHash);
 
   rcConnect.addEventListener("click", async function(){
     var S = D().control.st;
-    if (connected || K5.sessionOpen()){ await K5.release(); return; }
+    if (connected){ await K5.release(); return; }
     rcSt(S.connecting);
     var t = null;
     try {
@@ -2142,7 +2142,7 @@ window.addEventListener("hashchange", routeFromHash);
 
   chConnect.addEventListener("click", async function(){
     var S=D().chan.st;
-    if(connected || K5.sessionOpen()){ await K5.release(); return; }
+    if(connected){ await K5.release(); return; }
     chSt(S.connecting);
     var t=null;
     try{
@@ -2308,7 +2308,7 @@ window.addEventListener("hashchange", routeFromHash);
 
   seConnect.addEventListener("click", async function(){
     var S=D().set.st;
-    if(connected || K5.sessionOpen()){ await K5.release(); return; }
+    if(connected){ await K5.release(); return; }
     seSt(S.connecting);
     var t=null;
     try{
@@ -2451,17 +2451,25 @@ window.addEventListener("hashchange", routeFromHash);
       if(line) onLine(line);
     }
   }
+  function pause(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
   async function monLoop(){
     while(running){
+      if(!K5.sessionOpen() || !t){ break; }
+      // Only the visible section may read the shared port, otherwise two
+      // sections race for the same reply bytes.
+      if(!$("view-aprs").classList.contains("active")){ await pause(200); continue; }
       var chunk;
       try{ chunk=await t.recv(256,800); }catch(e){ break; }
       if(chunk&&chunk.length){ for(var i=0;i<chunk.length;i++) rxbuf+=String.fromCharCode(chunk[i]); extract(); }
+      else { await pause(20); }   // never spin: a closed stream reads instantly
     }
+    running=false;
   }
 
   $("apConnect").addEventListener("click", async function(){
     var S=D().ap.st;
-    if(connected || K5.sessionOpen()){ await K5.release(); return; }
+    if(connected){ await K5.release(); return; }
     apSt(S.connecting);
     try{
       t = await K5.acquire(); if(!t){ apSt(D().beacon.st.neither,"err"); return; }
