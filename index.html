@@ -132,7 +132,6 @@
   .bub .who{display:block;font:600 .58rem/1 ui-monospace,Menlo,monospace;letter-spacing:.04em;opacity:.7;margin-bottom:.2rem;}
   .bub .tm{display:block;font:400 .55rem/1 ui-monospace,Menlo,monospace;opacity:.5;margin-top:.25rem;text-align:right;}
   .bub .ack{margin-left:.35rem;opacity:.95;font-size:.7rem;}
-  li.step:not(.active):not(.done) a.skip{cursor:not-allowed;}
   .fwpick{display:flex;flex-direction:column;gap:.5rem;margin:.6rem 0 .3rem;}
   .fwpick label{display:flex;align-items:flex-start;gap:.5rem;font-size:.92rem;cursor:pointer;}
   /* the global input rule sets width:100%, which would stretch the radio and
@@ -679,7 +678,7 @@ var T = {
         noSerial: "No USB serial support in this browser.",
         portBusy: "The serial port is already open — close any other browser tab (or app) using the radio, then reload and try again.",
         skipped: "Skipped.",
-        stepLocked: "Finish the earlier steps first — this one is still locked.",
+        needRadio: "No radio connected — go back to step 1 and connect it first.",
         noAnswer: "Connected, but the radio didn't answer. Is it ON (not in flash mode)?",
         connected: function(v){ return "Connected. Radio firmware: " + v; },
         connFailed: "Connection failed.",
@@ -937,7 +936,7 @@ var T = {
         noSerial: "Bu tarayıcıda USB seri desteği yok.",
         portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeleri (veya uygulamaları) kapatın, sayfayı yenileyip tekrar deneyin.",
         skipped: "Atlandı.",
-        stepLocked: "Önce önceki adımları tamamla — bu adım henüz kilitli.",
+        needRadio: "Telsiz bağlı değil — 1. adıma dönüp bağlan.",
         noAnswer: "Bağlandı ama telsiz yanıt vermedi. Açık mı (yükleme modunda değil)?",
         connected: function(v){ return "Bağlandı. Telsiz firmware: " + v; },
         connFailed: "Bağlantı başarısız.",
@@ -1189,12 +1188,9 @@ window.addEventListener("hashchange", routeFromHash);
     var el = $(linkId); if (!el) return;
     el.addEventListener("click", function(ev){
       ev.preventDefault();
-      // Steps unlock in order, so a skip link on a locked step used to do
-      // nothing at all - it read as broken. Say why instead.
-      if (!$(curId).classList.contains("active")){
-        st(statusId, D().install.st.stepLocked, "err");
-        return;
-      }
+      // Every step is skippable, including ones not reached yet: the buttons
+      // each check for a connected radio themselves and say so if there is
+      // none, so jumping ahead cannot get the page into a broken state.
       var S = D().install.st;
       stepState(curId, "done"); st(statusId, S.skipped, "");
       activate(nextId);
@@ -1267,7 +1263,7 @@ window.addEventListener("hashchange", routeFromHash);
   }
   $("btnBackup").addEventListener("click", async function(){
     var S = D().install.st;
-    if (!radio) return;
+    if (!radio){ st("stBackup", S.needRadio, "err"); return; }
     $("btnBackup").disabled = true; st("stBackup", S.reading);
     try {
       var full = await radio.dumpEeprom(0x0000, 0x2000, function(d,t){ bar("barBackup", d, t); });
@@ -1282,7 +1278,7 @@ window.addEventListener("hashchange", routeFromHash);
 
   $("btnWipe").addEventListener("click", async function(){
     var S = D().install.st;
-    if (!radio) return;
+    if (!radio){ st("stWipe", S.needRadio, "err"); return; }
     if (!backedUp && !confirm(S.wipeConfirm)) return;
     $("btnWipe").disabled = true; st("stWipe", S.wiping);
     try {
@@ -1297,7 +1293,7 @@ window.addEventListener("hashchange", routeFromHash);
 
   $("btnFlashMode").addEventListener("click", async function(){
     var S = D().install.st;
-    if (!radio) return;
+    if (!radio){ st("stFlashMode", S.needRadio, "err"); return; }
     st("stFlashMode", S.listening);
     try {
       var b = await radio.waitBeacon(6000);
@@ -1311,7 +1307,8 @@ window.addEventListener("hashchange", routeFromHash);
 
   $("btnFlash").addEventListener("click", async function(){
     var S = D().install.st;
-    if (!radio || K5.isMobile) return;
+    if (K5.isMobile){ st("stFlash", S.flashDesktopOnly, "err"); return; }
+    if (!radio){ st("stFlash", S.needRadio, "err"); return; }
     $("btnFlash").disabled = true; st("stFlash", S.downloading);
     try {
       var img = fwPick();
@@ -1354,7 +1351,7 @@ window.addEventListener("hashchange", routeFromHash);
   }
   $("btnSave").addEventListener("click", async function(){
     var S = D().install.st;
-    if (!radio) return;
+    if (!radio){ st("stSave", S.needRadio, "err"); return; }
     var call = cleanCall($("call").value, 6);
     if (call.length < 3){ st("stSave", S.badCall, "err"); return; }
     var ssid = parseInt($("ssid").value, 10) & 0x0F;
