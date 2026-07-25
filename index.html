@@ -564,7 +564,7 @@
 
 </div>
 
-<script src="k5.js?v=9"></script>
+<script src="k5.js?v=10"></script>
 <script>
 "use strict";
 
@@ -1054,8 +1054,8 @@ window.addEventListener("hashchange", routeFromHash);
         var hex = Array.prototype.map.call(got, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(" ");
         $("raw").value = "DIAG build b11 · hello raw · " + got.length + " byte(s):\n" + (hex || "(nothing received)");
         $("raw").style.display = "block";
+        try { await K5.release(true); } catch(_e){}   // forget the grant: a wrong pick must reopen the picker
         st("stConnect", S.noAnswer, "err");
-        try { await t.disconnect(); } catch(_e){}
         radio = null;
         return;
       }
@@ -1065,9 +1065,9 @@ window.addEventListener("hashchange", routeFromHash);
     } catch(e){
       var m = (e && e.message) ? e.message : String(e);
       var busy = /open|in use|already|network/i.test(m);
+      try { await K5.release(); } catch(_e){}
       st("stConnect", busy ? S.portBusy : S.connFailed, "err");
       if (!/No device selected|cancel/i.test(m)){ $("raw").value = (e && e.name ? e.name + "\n" : "") + m; $("raw").style.display = "block"; }
-      try { if (t) await t.disconnect(); } catch(_e){}
       radio = null;
     }
   });
@@ -1615,7 +1615,7 @@ window.addEventListener("hashchange", routeFromHash);
       radio = new K5.Radio(t);
       var ver = await radio.hello();
       var s = ver ? await radio.getState() : null;
-      if (!s){ rcSt(S.needFw, "err"); try { await t.disconnect(); } catch(e){} radio = null; return; }
+      if (!s){ try { await K5.release(true); } catch(e){} rcSt(S.needFw, "err"); radio = null; return; }
       connected = true;
       rcSt(S.connected(ver), "ok");
       rcConnect.textContent = D().install.st.disconnect; rcConnect.classList.add("connected");
@@ -1626,8 +1626,8 @@ window.addEventListener("hashchange", routeFromHash);
     } catch(e){
       var m = (e && e.message) ? e.message : String(e);
       var busy = /open|in use|already|network/i.test(m);
+      try { await K5.release(); } catch(_e){}
       rcSt(busy ? S.portBusy : S.connFail, "err");
-      try { if (t) await t.disconnect(); } catch(_e){}
       radio = null;
     }
   });
@@ -1733,13 +1733,13 @@ window.addEventListener("hashchange", routeFromHash);
       t = await K5.acquire(); if(!t){ chSt(D().beacon.st.neither,"err"); return; }
       radio=new K5.Radio(t);
       var ver=await radio.hello();
-      if(!ver){ chSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} radio=null; return; }
+      if(!ver){ try{await K5.release(true);}catch(e){} chSt(D().install.st.noAnswer,"err"); radio=null; return; }
       connected=true; chSt(S.connected(ver),"ok");
       chConnect.textContent=D().install.st.disconnect; chConnect.classList.add("connected");
       $("chPanel").style.display="block";
     }catch(e){
       var m=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(m);
-      chSt(busy?S.portBusy:S.connFail,"err"); try{if(t)await t.disconnect();}catch(_e){} radio=null;
+      try{await K5.release();}catch(_e){} chSt(busy?S.portBusy:S.connFail,"err"); radio=null;
     }
   });
 
@@ -1911,13 +1911,13 @@ window.addEventListener("hashchange", routeFromHash);
       t = await K5.acquire(); if(!t){ seSt(D().beacon.st.neither,"err"); return; }
       radio=new K5.Radio(t);
       var ver=await radio.hello();
-      if(!ver){ seSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} radio=null; return; }
+      if(!ver){ try{await K5.release(true);}catch(e){} seSt(D().install.st.noAnswer,"err"); radio=null; return; }
       connected=true; seSt(S.connected(ver),"ok");
       seConnect.textContent=D().install.st.disconnect; seConnect.classList.add("connected");
       $("sePanel").style.display="block";
     }catch(e){
       var m=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(m);
-      seSt(busy?S.portBusy:S.connFail,"err"); try{if(t)await t.disconnect();}catch(_e){} radio=null;
+      try{await K5.release();}catch(_e){} seSt(busy?S.portBusy:S.connFail,"err"); radio=null;
     }
   });
 
@@ -2083,13 +2083,13 @@ window.addEventListener("hashchange", routeFromHash);
       t = await K5.acquire(); if(!t){ apSt(D().beacon.st.neither,"err"); return; }
       radio=new K5.Radio(t);
       var ver=await radio.hello();
-      if(!ver){ apSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} t=null; return; }
+      if(!ver){ try{await K5.release(true);}catch(e){} apSt(D().install.st.noAnswer,"err"); t=null; return; }
       connected=true; apSt(S.connected(ver),"ok");
       $("apConnect").textContent=D().install.st.disconnect; $("apConnect").classList.add("connected");
       running=true; monLoop();
     }catch(e){
       var msg=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(msg);
-      apSt(busy?S.portBusy:S.connFail,"err"); try{if(t)await t.disconnect();}catch(_e){} t=null;
+      try{await K5.release();}catch(_e){} apSt(busy?S.portBusy:S.connFail,"err"); t=null;
     }
   });
 

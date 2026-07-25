@@ -88,6 +88,7 @@ var K5 = (function () {
   // ---- transports: each exposes connect(preDevice), send(bytes), recv(max,timeoutMs), name ----
   function makeWebSerial() {
     var port = null, reader = null, writer = null, pending = null, closed = false;
+    var granted = null;  // survives disconnect(), so forget() can revoke the grant
     var TIMED_OUT = {};
     return {
       name: "Web Serial",
@@ -95,11 +96,23 @@ var K5 = (function () {
       connect: async function () {
         closed = false;
         // Reuse a port the user already granted, so the picker appears once per
-        // browser rather than once per section.
+        // browser rather than once per section. But never let that reuse lock
+        // the user out: a granted port that will not open is forgotten and the
+        // picker comes back (issue #2 — wrong COM port picked on Windows, and
+        // the grant persists across browser restarts).
         var known = [];
         try { known = await navigator.serial.getPorts(); } catch (e) {}
-        port = (known && known.length === 1) ? known[0] : await navigator.serial.requestPort();
-        await port.open({ baudRate: 38400 });
+        var reused = (known && known.length === 1);
+        port = reused ? known[0] : await navigator.serial.requestPort();
+        try {
+          await port.open({ baudRate: 38400 });
+        } catch (e) {
+          if (!reused) throw e;
+          try { await port.forget(); } catch (e2) {}
+          port = await navigator.serial.requestPort();
+          await port.open({ baudRate: 38400 });
+        }
+        granted = port;
         writer = port.writable.getWriter();
         reader = port.readable.getReader();
         pending = null;
@@ -142,6 +155,11 @@ var K5 = (function () {
           ]);
         } catch (e) {}
         pending = null; reader = null; writer = null; port = null;
+      },
+      // revoke the permission grant so the next connect shows the picker again
+      forget: async function () {
+        try { if (granted) await granted.forget(); } catch (e) {}
+        granted = null;
       }
     };
   }
@@ -201,7 +219,8 @@ var K5 = (function () {
         } catch (e) { pendingIn = null; return new Uint8Array(0); }
         finally { clearTimeout(timer); }
       },
-      disconnect: async function () { try { if (dev) await dev.close(); } catch (e) {} pendingIn = null; }
+      disconnect: async function () { try { if (dev) await dev.close(); } catch (e) {} pendingIn = null; },
+      forget: async function () { try { if (dev && dev.forget) await dev.forget(); } catch (e) {} }
     };
   }
 
@@ -599,12 +618,18 @@ var K5 = (function () {
     notifyConn();
     return sessionT;
   }
-  async function release(){
+  // release(true) also revokes the port's permission grant: used when the
+  // radio never answered, so the wrong-port trap (issue #2, Windows report)
+  // resolves itself — the next Connect click shows the picker again.
+  async function release(forgetToo){
     var t = sessionT;
     sessionT = null;
     notifyConn();          // stop the read loops BEFORE closing the port:
                            // they would otherwise spin on a dying stream
-    if (t) { try { await t.disconnect(); } catch (e) {} }
+    if (t) {
+      try { await t.disconnect(); } catch (e) {}
+      if (forgetToo && t.forget) { try { await t.forget(); } catch (e) {} }
+    }
     notifyConn();          // again, so late listeners still settle
   }
 
