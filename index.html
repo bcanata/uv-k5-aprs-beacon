@@ -116,8 +116,20 @@
   .rc-lcd{background:var(--lcd-bg);border:1px solid var(--lcd-frame);border-radius:10px;padding:.8rem;display:flex;justify-content:center;margin-top:1rem;position:relative;}
   /* the mirror-paused notice overlays the LCD itself — a dim footnote under a
      black canvas reads as a broken page (issue #2, fourth report) */
-  #rcScreenNote{display:none;}
-  #rcScreenNote:not(:empty){display:flex;position:absolute;inset:0;margin:0;padding:1rem;align-items:center;justify-content:center;text-align:center;border-radius:10px;background:rgba(8,10,8,.85);color:#ffb020;font-size:.88rem;font-weight:600;line-height:1.5;}
+  #rcPaused{display:none;}
+  #rcPaused.on{display:flex;position:absolute;inset:0;margin:0;padding:1rem;flex-direction:column;gap:.7rem;align-items:center;justify-content:center;text-align:center;border-radius:10px;background:rgba(8,10,8,.85);}
+  #rcScreenNote{margin:0;color:#ffb020;font-size:.88rem;font-weight:600;line-height:1.5;}
+  #rcAprsOff{padding:.4rem .9rem;font-size:.85rem;border-radius:8px;border:1px solid var(--ok);background:transparent;color:var(--ok);cursor:pointer;}
+  #rcAprsOff:hover{background:var(--ok);color:#04120a;}
+  #rcAprsOff:disabled{opacity:.5;cursor:default;}
+  /* APRS tab: listening off means nothing comes back — say so where it matters */
+  #apOffBanner{display:none;}
+  #apOffBanner.on{display:flex;flex-wrap:wrap;gap:.7rem;align-items:center;justify-content:space-between;
+    margin:1rem 0;padding:.7rem .9rem;border:1px solid #ffb020;border-radius:10px;
+    background:rgba(255,176,32,.08);color:#ffb020;font-size:.88rem;line-height:1.5;}
+  #apAprsOn{padding:.4rem .9rem;font-size:.85rem;border-radius:8px;border:1px solid var(--ok);background:transparent;color:var(--ok);cursor:pointer;white-space:nowrap;}
+  #apAprsOn:hover{background:var(--ok);color:#04120a;}
+  #apAprsOn:disabled{opacity:.5;cursor:default;}
   #rcScreen{width:100%;max-width:24rem;image-rendering:pixelated;aspect-ratio:128/64;background:#0d0b05;border-radius:4px;}
   .rc-state{display:grid;grid-template-columns:repeat(2,1fr);gap:.4rem .8rem;margin:.9rem 0;font:600 .78rem/1.3 ui-monospace,Menlo,monospace;color:var(--muted);}
   .rc-state b{color:var(--ink);font-weight:700;}
@@ -415,7 +427,9 @@
     <p class="status" id="rcStatus"></p>
 
     <div id="rcPanel" style="display:none">
-      <div class="rc-lcd"><canvas id="rcScreen" width="128" height="64"></canvas><p id="rcScreenNote"></p></div>
+      <div class="rc-lcd"><canvas id="rcScreen" width="128" height="64"></canvas>
+        <div id="rcPaused"><p id="rcScreenNote"></p><button id="rcAprsOff" type="button" data-i18n="control.aprsOffBtn"></button></div>
+      </div>
       <div class="rc-state" id="rcState"></div>
 
       <div class="rc-nav">
@@ -513,6 +527,8 @@
     <button id="apConnect" class="big" type="button" data-i18n="ap.connect"></button>
     <p class="status" id="apStatus"></p>
 
+    <div id="apOffBanner"><span data-i18n="ap.offBanner"></span><button id="apAprsOn" type="button" data-i18n="ap.onBtn"></button></div>
+
     <h2 class="sec" data-i18n="ap.chatTitle">Messages</h2>
     <div class="chat" id="apChat"></div>
     <div class="compose">
@@ -564,7 +580,7 @@
 
 </div>
 
-<script src="k5.js?v=11"></script>
+<script src="k5.js?v=12"></script>
 <script>
 "use strict";
 
@@ -623,6 +639,8 @@ var T = {
       emptyLog: "No packets yet — decoded APRS packets the radio reports will appear here.",
       emptyChat: "No messages yet. Incoming messages to your callsign show here.",
       delivered: "Delivered — acknowledged by the receiving station",
+      offBanner: "APRS listening is OFF on the radio. You can still send, but nothing comes back: no incoming messages, no delivery acknowledgements, no received packets.",
+      onBtn: "Turn APRS on",
       confirmClear: "Clear all of these? This can't be undone.",
       fine: "Everything is stored in this browser (not the radio) and persists between visits. The log captures every decoded packet the radio reports; the chat shows messages addressed to your callsign and the ones you send — a ✓ on a sent message means the other station acknowledged it. Requires the radio on 144.800 MHz with APRS RX on.",
       st: {
@@ -633,7 +651,9 @@ var T = {
         needTo: "Enter a destination callsign first.",
         needText: "Type a message first.",
         sent: "Message sent.",
-        sendFail: function(e){ return "Send failed: " + e; }
+        sendFail: function(e){ return "Send failed: " + e; },
+        aprsOn: "APRS listening switched on — incoming traffic will appear here.",
+        aprsOnFail: "The radio didn't accept that. Update the firmware from the Install tab, or use menu APRS on the radio."
       }
     },
     set: {
@@ -807,9 +827,12 @@ var T = {
       ptt: "PTT — hold to transmit",
       fine: "The on-screen keys behave exactly like the radio's physical keys (settings save on release). PTT transmits while held — use only on frequencies you are licensed for. The live screen pauses while menu <b>APRS</b> is ON: mirroring the display holds the radio's interrupts off for about a quarter of a second, which would destroy a packet being received.",
       screenPaused: "Live screen paused — menu APRS is ON. Turn it OFF to mirror the display.",
+      aprsOffBtn: "Turn APRS off",
       st: {
         connecting: "Connecting…",
         connected: function(v){ return "Connected: " + v; },
+        aprsOff: "APRS listening switched off — the live screen starts in a moment.",
+        aprsOffFail: "The radio didn't accept that. Update the firmware from the Install tab, or use menu APRS on the radio.",
         needFw: "Connected, but this radio didn't answer control commands. Flash TA1JS v1.1+ (Install tab) with radio control.",
         connFail: "Connection failed.",
         portBusy: "The serial port is already open — close any other tab using the radio, then retry."
@@ -1523,10 +1546,26 @@ window.addEventListener("hashchange", routeFromHash);
   // Whether the radio is refusing the mirror, read from the APRS ON flag
   // persisted at 0x0E30 byte 0 (so the notice is instant, not a second late).
   var mirrorPaused = false;
-  async function refreshMirrorFlag(){
-    try { var b = await radio.readCfg(0x0E30, 8); mirrorPaused = !!(b && b[0] === 1); } catch(e){}
+  function showPaused(){
     $("rcScreenNote").textContent = mirrorPaused ? D().control.screenPaused : "";
+    $("rcPaused").classList.toggle("on", mirrorPaused);
   }
+  async function refreshMirrorFlag(){
+    try { mirrorPaused = await radio.aprsOn(); } catch(e){}
+    showPaused();
+  }
+
+  // Turn APRS listening off from here, so the live screen can start without
+  // walking back to the radio's menu (uv-k5-aprs-beacon#2).
+  $("rcAprsOff").addEventListener("click", async function(){
+    if (!radio) return;
+    var b = $("rcAprsOff"); b.disabled = true;
+    try {
+      if (await radio.setAprsOn(false)){ mirrorPaused = false; showPaused(); rcSt(D().control.st.aprsOff, "ok"); }
+      else rcSt(D().control.st.aprsOffFail, "err");
+    } catch(e){ rcSt(D().control.st.aprsOffFail, "err"); }
+    b.disabled = false;
+  });
 
   function loop(){
     if (!running) return;
@@ -1542,8 +1581,8 @@ window.addEventListener("hashchange", routeFromHash);
           await refreshMirrorFlag();
         } else {
           var buf = await radio.pollScreen(1500);
-          if (buf){ renderScreen(buf); $("rcScreenNote").textContent = ""; }
-          else { mirrorPaused = true; $("rcScreenNote").textContent = D().control.screenPaused; }
+          if (buf){ renderScreen(buf); showPaused(); }
+          else { mirrorPaused = true; showPaused(); }
         }
         var s = await radio.getState();
         if (s) renderState(s);
@@ -2095,11 +2134,28 @@ window.addEventListener("hashchange", routeFromHash);
       if(!ver){ try{await K5.release(true);}catch(e){} apSt(D().install.st.noAnswer,"err"); t=null; return; }
       connected=true; apSt(S.connected(ver),"ok");
       $("apConnect").textContent=D().install.st.disconnect; $("apConnect").classList.add("connected");
+      await apCheckAprs();
       running=true; monLoop();
     }catch(e){
       var msg=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(msg);
       try{await K5.release();}catch(_e){} apSt(busy?S.portBusy:S.connFail,"err"); t=null;
     }
+  });
+
+  // With listening OFF the radio still transmits, but nothing comes back:
+  // no incoming messages, no acks, no packet log. Say so, and offer the switch.
+  async function apCheckAprs(){
+    if(!radio){ $("apOffBanner").classList.remove("on"); return; }
+    try{ $("apOffBanner").classList.toggle("on", !(await radio.aprsOn())); }catch(e){}
+  }
+  $("apAprsOn").addEventListener("click", async function(){
+    if(!radio) return;
+    var b=$("apAprsOn"); b.disabled=true;
+    try{
+      if(await radio.setAprsOn(true)){ $("apOffBanner").classList.remove("on"); apSt(D().ap.st.aprsOn,"ok"); }
+      else apSt(D().ap.st.aprsOnFail,"err");
+    }catch(e){ apSt(D().ap.st.aprsOnFail,"err"); }
+    b.disabled=false;
   });
 
   function msgFrame(dest,text){
@@ -2136,6 +2192,7 @@ window.addEventListener("hashchange", routeFromHash);
       var ver = await radio.hello(); if (!ver){ t = null; radio = null; return; }
       connected = true; apSt(D().ap.st.connected(ver), "ok");
       $("apConnect").textContent = D().install.st.disconnect; $("apConnect").classList.add("connected");
+      await apCheckAprs();
       running = true; monLoop();
     } catch(e){ t = null; radio = null; }
   });
@@ -2144,6 +2201,7 @@ window.addEventListener("hashchange", routeFromHash);
     if (open) return;
     connected = false; running = false; radio = null; t = null;
     $("apConnect").textContent = D().ap.connect; $("apConnect").classList.remove("connected");
+    $("apOffBanner").classList.remove("on");
     apSt("");
   });
 

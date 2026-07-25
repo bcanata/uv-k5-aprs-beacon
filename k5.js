@@ -382,6 +382,22 @@ var K5 = (function () {
   // 1024-byte buffer, or null - the firmware deliberately answers nothing while
   // APRS listening is on, because the push holds interrupts off for ~270 ms and
   // would destroy a packet being received.
+  // Is APRS listening on? Read from the flag the firmware persists at 0x0E30
+  // byte 0 (SETTINGS_SaveAPRS), which the menu rewrites on every change.
+  Radio.prototype.aprsOn = async function () {
+    var b = await this.readCfg(0x0E30, 8);
+    return !!(b && b[0] === 1);
+  };
+  // 0x0706: switch APRS listening on/off. Needs firmware from 2026-07-25 or
+  // newer; older builds simply never answer, so the caller reports that.
+  Radio.prototype.setAprsOn = function (on) {
+    var self = this;
+    return this._run(async function () {
+      var p = await self._exchange(frameCommand(0x0706, new Uint8Array([on ? 1 : 0])), 1500);
+      return !!p && (p[0] | (p[1] << 8)) === 0x0707;
+    });
+  };
+
   // 0x0A03 answers with a raw 1026-byte blob, not a framed reply, so it does
   // its own read loop — it still has to hold the port lock while doing so.
   Radio.prototype.pollScreen = function (timeoutMs) {

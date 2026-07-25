@@ -15,6 +15,8 @@ T.pl = {
       msgPh: "Wiadomość (maks. 30)", toPh: "TA1XYZ-7",
       emptyLog: "Brak pakietów — zdekodowane przez radio pakiety APRS pojawią się tutaj.",
       emptyChat: "Brak wiadomości. Wiadomości przychodzące na Twój znak wywoławczy pojawią się tutaj.",
+      offBanner: "Nasłuch APRS w radiu jest WYŁĄCZONY. Nadawać nadal można, ale nic nie wraca: brak wiadomości przychodzących, brak potwierdzeń doręczenia, brak odebranych pakietów.",
+      onBtn: "Włącz APRS",
       delivered: "Dostarczono — potwierdzone przez stację odbierającą",
       confirmClear: "Wyczyścić wszystko? Nie da się tego cofnąć.",
       fine: "Wszystko jest zapisywane w tej przeglądarce (nie w radiu) i zostaje między wizytami. Dziennik zbiera każdy zdekodowany pakiet zgłoszony przez radio; czat pokazuje wiadomości na Twój znak wywoławczy oraz te, które wysyłasz — ✓ przy wysłanej wiadomości oznacza, że druga stacja ją potwierdziła. Wymaga radia na 144.800 MHz z włączonym APRS RX.",
@@ -26,6 +28,8 @@ T.pl = {
         needTo: "Najpierw podaj znak wywoławczy odbiorcy.",
         needText: "Najpierw wpisz wiadomość.",
         sent: "Wiadomość wysłana.",
+        aprsOn: "Nasłuch APRS włączony — odbierany ruch pojawi się tutaj.",
+        aprsOnFail: "Radio nie przyjęło polecenia. Zaktualizuj firmware w zakładce Instalacja albo użyj menu APRS w radiu.",
         sendFail: function(e){ return "Błąd wysyłania: " + e; }
       }
     },
@@ -200,9 +204,12 @@ T.pl = {
       ptt: "PTT — przytrzymaj, aby nadawać",
       fine: "Przyciski na ekranie działają dokładnie tak jak fizyczne klawisze radia (ustawienia zapisują się po puszczeniu). PTT nadaje, dopóki je trzymasz — używaj tylko na częstotliwościach objętych Twoją licencją. Podgląd na żywo jest wstrzymany, gdy w menu <b>APRS</b> jest ON: kopiowanie wyświetlacza utrzymuje przerwania radia wyłączone przez około ćwierć sekundy, a to zniszczyłoby właśnie odbierany pakiet.",
       screenPaused: "Podgląd na żywo wstrzymany — w menu APRS jest ON. Ustaw OFF, aby zobaczyć wyświetlacz.",
+      aprsOffBtn: "Wyłącz APRS",
       st: {
         connecting: "Łączenie…",
         connected: function(v){ return "Połączono: " + v; },
+        aprsOff: "Nasłuch APRS wyłączony — ekran na żywo zaraz się pojawi.",
+        aprsOffFail: "Radio nie przyjęło polecenia. Zaktualizuj firmware w zakładce Instalacja albo użyj menu APRS w radiu.",
         needFw: "Połączono, ale to radio nie odpowiedziało na polecenia sterowania. Wgraj TA1JS v1.1+ (karta Instalacja) ze sterowaniem radiem.",
         connFail: "Połączenie nie udało się.",
         portBusy: "Port szeregowy jest już otwarty — zamknij inne karty korzystające z radia i spróbuj ponownie."

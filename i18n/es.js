@@ -15,6 +15,8 @@ T.es = {
       msgPh: "Mensaje (máx. 30)", toPh: "TA1XYZ-7",
       emptyLog: "Aún no hay paquetes — los paquetes APRS que decodifique la radio aparecerán aquí.",
       emptyChat: "Aún no hay mensajes. Los mensajes dirigidos a tu indicativo se muestran aquí.",
+      offBanner: "La escucha APRS está DESACTIVADA en la radio. Puedes seguir enviando, pero no llega nada de vuelta: ni mensajes entrantes, ni acuses de recibo, ni paquetes recibidos.",
+      onBtn: "Activar APRS",
       delivered: "Entregado — confirmado por la estación receptora",
       confirmClear: "¿Borrar todo esto? No se puede deshacer.",
       fine: "Todo se guarda en este navegador (no en la radio) y se conserva entre visitas. El registro captura cada paquete decodificado que informa la radio; el chat muestra los mensajes dirigidos a tu indicativo y los que envías — un ✓ en un mensaje enviado significa que la otra estación lo confirmó. Requiere la radio en 144.800 MHz con APRS RX activado.",
@@ -26,6 +28,8 @@ T.es = {
         needTo: "Escribe primero el indicativo de destino.",
         needText: "Escribe primero un mensaje.",
         sent: "Mensaje enviado.",
+        aprsOn: "Escucha APRS activada: el tráfico entrante aparecerá aquí.",
+        aprsOnFail: "La radio no aceptó el comando. Actualiza el firmware desde la pestaña Instalar o usa el menú APRS en la radio.",
         sendFail: function(e){ return "Error al enviar: " + e; }
       }
     },
@@ -200,9 +204,12 @@ T.es = {
       ptt: "PTT — mantén pulsado para transmitir",
       fine: "Las teclas en pantalla se comportan igual que las físicas de la radio (los ajustes se guardan al soltar). PTT transmite mientras lo mantienes pulsado — úsalo solo en frecuencias para las que tengas licencia. La pantalla en vivo se pausa cuando el menú <b>APRS</b> está en ON: reflejar la pantalla mantiene las interrupciones de la radio desactivadas cerca de un cuarto de segundo, y eso destruiría un paquete en recepción.",
       screenPaused: "Pantalla en vivo pausada — el menú APRS está en ON. Ponlo en OFF para reflejar la pantalla.",
+      aprsOffBtn: "Desactivar APRS",
       st: {
         connecting: "Conectando…",
         connected: function(v){ return "Conectado: " + v; },
+        aprsOff: "Escucha APRS desactivada: la pantalla en vivo empieza en un momento.",
+        aprsOffFail: "La radio no aceptó el comando. Actualiza el firmware desde la pestaña Instalar o usa el menú APRS en la radio.",
         needFw: "Conectado, pero esta radio no respondió a los comandos de control. Graba TA1JS v1.1+ (pestaña Instalar) con control de radio.",
         connFail: "Falló la conexión.",
         portBusy: "El puerto serie ya está abierto — cierra cualquier otra pestaña que esté usando la radio y vuelve a intentarlo."

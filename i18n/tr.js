@@ -15,6 +15,8 @@ T.tr = {
       msgPh: "Mesaj (en çok 30)", toPh: "TA1XYZ-7",
       emptyLog: "Henüz paket yok — telsizin çözdüğü APRS paketleri burada görünür.",
       emptyChat: "Henüz mesaj yok. Çağrı işaretinize gelen mesajlar burada görünür.",
+      offBanner: "Telsizde APRS dinleme KAPALI. Göndermeye devam edebilirsiniz ama hiçbir şey geri gelmez: gelen mesaj yok, teslim onayı yok, alınan paket yok.",
+      onBtn: "APRS'i aç",
       delivered: "İletildi — karşı istasyon teyit etti",
       confirmClear: "Hepsi silinsin mi? Bu geri alınamaz.",
       fine: "Her şey bu tarayıcıda saklanır (telsizde değil) ve ziyaretler arasında kalır. Kayıt, telsizin çözdüğü her paketi tutar; sohbet, çağrı işaretinize gelen ve gönderdiğiniz mesajları gösterir — gönderdiğiniz bir mesajın yanındaki ✓ karşı istasyonun teyit ettiği anlamına gelir. Telsizin 144.800 MHz'de ve APRS RX açık olması gerekir.",
@@ -26,6 +28,8 @@ T.tr = {
         needTo: "Önce hedef çağrı işareti gir.",
         needText: "Önce bir mesaj yaz.",
         sent: "Mesaj gönderildi.",
+        aprsOn: "APRS dinleme açıldı — gelen trafik burada görünecek.",
+        aprsOnFail: "Telsiz bunu kabul etmedi. Kurulum sekmesinden yazılımı güncelleyin veya telsizdeki APRS menüsünü kullanın.",
         sendFail: function(e){ return "Gönderim başarısız: " + e; }
       }
     },
@@ -200,9 +204,12 @@ T.tr = {
       ptt: "PTT — bas ve konuş",
       fine: "Ekrandaki tuşlar telsizin gerçek tuşları gibi davranır (ayarlar bırakınca kaydedilir). PTT basılı tutuldukça yayın yapar — yalnızca lisanslı olduğunuz frekanslarda kullanın. Menüde <b>APRS</b> ON iken canlı ekran duraklar: ekranı yansıtmak telsizin kesmelerini yaklaşık çeyrek saniye kapatıyor ve o an alınan paketi yok ediyor.",
       screenPaused: "Canlı ekran duraklatıldı — menüde APRS ON. Yansıtmak için OFF yapın.",
+      aprsOffBtn: "APRS'i kapat",
       st: {
         connecting: "Bağlanıyor…",
         connected: function(v){ return "Bağlandı: " + v; },
+        aprsOff: "APRS dinleme kapatıldı — canlı ekran birazdan başlıyor.",
+        aprsOffFail: "Telsiz bunu kabul etmedi. Kurulum sekmesinden yazılımı güncelleyin veya telsizdeki APRS menüsünü kullanın.",
         needFw: "Bağlandı ama telsiz kontrol komutlarına yanıt vermedi. Kurulum sekmesinden telsiz kontrollü TA1JS v1.1+ yükleyin.",
         connFail: "Bağlantı başarısız.",
         portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeyi kapatıp tekrar deneyin."

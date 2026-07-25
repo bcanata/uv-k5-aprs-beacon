@@ -15,6 +15,8 @@ T.de = {
       msgPh: "Nachricht (max. 30)", toPh: "TA1XYZ-7",
       emptyLog: "Noch keine Pakete — dekodierte APRS-Pakete, die das Funkgerät meldet, erscheinen hier.",
       emptyChat: "Noch keine Nachrichten. Eingehende Nachrichten an dein Rufzeichen erscheinen hier.",
+      offBanner: "Der APRS-Empfang am Funkgerät ist AUS. Senden geht weiterhin, aber es kommt nichts zurück: keine eingehenden Nachrichten, keine Empfangsbestätigungen, keine empfangenen Pakete.",
+      onBtn: "APRS einschalten",
       delivered: "Zugestellt — von der Gegenstation bestätigt",
       confirmClear: "Alles löschen? Das lässt sich nicht rückgängig machen.",
       fine: "Alles wird in diesem Browser gespeichert (nicht im Funkgerät) und bleibt zwischen den Besuchen erhalten. Das Log erfasst jedes dekodierte Paket, das das Funkgerät meldet; der Chat zeigt Nachrichten an dein Rufzeichen und die, die du sendest — ein ✓ an einer gesendeten Nachricht heißt, dass die Gegenstation sie bestätigt hat. Erfordert das Funkgerät auf 144.800 MHz mit eingeschaltetem APRS-RX.",
@@ -26,6 +28,8 @@ T.de = {
         needTo: "Zuerst ein Ziel-Rufzeichen eingeben.",
         needText: "Zuerst eine Nachricht eingeben.",
         sent: "Nachricht gesendet.",
+        aprsOn: "APRS-Empfang eingeschaltet — eingehender Verkehr erscheint hier.",
+        aprsOnFail: "Das Funkgerät hat den Befehl nicht angenommen. Aktualisiere die Firmware im Tab „Installieren“ oder nutze das APRS-Menü am Gerät.",
         sendFail: function(e){ return "Senden fehlgeschlagen: " + e; }
       }
     },
@@ -200,9 +204,12 @@ T.de = {
       ptt: "PTT — zum Senden halten",
       fine: "Die Tasten auf dem Bildschirm verhalten sich genau wie die echten Tasten des Funkgeräts (Einstellungen werden beim Loslassen gespeichert). PTT sendet, solange du es hältst — nur auf Frequenzen benutzen, für die du lizenziert bist. Das Live-Display pausiert, solange im Menü <b>APRS</b> auf ON steht: das Spiegeln des Displays hält die Interrupts des Funkgeräts etwa eine Viertelsekunde lang abgeschaltet, und das würde ein gerade empfangenes Paket zerstören.",
       screenPaused: "Live-Display pausiert — im Menü steht APRS auf ON. Stell es auf OFF, um das Display zu spiegeln.",
+      aprsOffBtn: "APRS ausschalten",
       st: {
         connecting: "Verbinde…",
         connected: function(v){ return "Verbunden: " + v; },
+        aprsOff: "APRS-Empfang ausgeschaltet — der Live-Bildschirm startet gleich.",
+        aprsOffFail: "Das Funkgerät hat den Befehl nicht angenommen. Aktualisiere die Firmware im Tab „Installieren“ oder nutze das APRS-Menü am Gerät.",
         needFw: "Verbunden, aber dieses Funkgerät hat nicht auf Steuerbefehle geantwortet. Flashe TA1JS v1.1+ (Reiter „Installieren“) mit Gerätesteuerung.",
         connFail: "Verbindung fehlgeschlagen.",
         portBusy: "Der serielle Port ist schon offen — schließe alle anderen Tabs, die das Funkgerät benutzen, und versuch es erneut."
