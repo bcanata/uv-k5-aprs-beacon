@@ -28,6 +28,12 @@
       font:700 .72rem/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;padding:.4rem .6rem;cursor:pointer;}
   .langtoggle button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);}
   .langtoggle button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px;}
+  /* the global input/select rule sets width:100%, which would stretch this
+     across the header the way it did to the band radios */
+  .langtoggle select{width:auto;border:0;border-radius:0;background:transparent;
+      color:var(--muted);font:600 .72rem/1 ui-monospace,Menlo,monospace;
+      letter-spacing:.04em;padding:.4rem .5rem;cursor:pointer;}
+  .langtoggle select:focus-visible{outline:2px solid var(--ink);outline-offset:-2px;}
   nav.tabs{display:flex;gap:.4rem;padding:.4rem 0 1rem;border-bottom:1px solid var(--line);margin-bottom:1.4rem;
       font:600 .74rem/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;flex-wrap:wrap;}
   nav.tabs a{color:var(--muted);text-decoration:none;padding:.45rem .7rem;border-radius:6px;}
@@ -211,10 +217,17 @@
 
   <div class="topbar">
     <div class="eyebrow" data-i18n="brand.eyebrow">Quansheng UV-K5 · APRS Edition</div>
-    <div class="langtoggle" role="group" aria-label="Language">
-      <button type="button" data-lang="tr" aria-pressed="false">TR</button>
-      <button type="button" data-lang="zh" aria-pressed="false">中文</button>
-      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    <div class="langtoggle">
+      <select id="langSel" aria-label="Language / Dil / 语言">
+        <option value="en">English</option>
+        <option value="tr">Türkçe</option>
+        <option value="zh">简体中文</option>
+        <option value="ru">Русский</option>
+        <option value="es">Español</option>
+        <option value="de">Deutsch</option>
+        <option value="pt">Português (BR)</option>
+        <option value="pl">Polski</option>
+      </select>
     </div>
   </div>
   <div style="font:600 .6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:var(--muted);text-align:right;margin:-.3rem 0 .3rem">build b11</div>
@@ -860,7 +873,8 @@ var T = {
 // are selected, so adding a language costs nothing on first load. Bump I18N_V
 // whenever a dictionary file changes.
 var I18N_V = "1";
-var LANGS  = { en: null, tr: "i18n/tr.js", zh: "i18n/zh.js" };
+var LANGS  = { en: null, tr: "i18n/tr.js", zh: "i18n/zh.js", ru: "i18n/ru.js",
+               es: "i18n/es.js", de: "i18n/de.js", pt: "i18n/pt.js", pl: "i18n/pl.js" };
 var langPending = {};
 
 function loadLang(l){
@@ -887,8 +901,7 @@ function setLang(l){
 
 var LANG = (function(){
   var l = (navigator.language || "").toLowerCase();
-  if (l.indexOf("tr") === 0) return "tr";
-  if (l.indexOf("zh") === 0) return "zh";
+  for (var k in LANGS) if (k !== "en" && l.indexOf(k) === 0) return k;
   return "en";
 })();
 var LANG_HOOKS = [];
@@ -907,8 +920,8 @@ function applyLang(){
   for (var i = 0; i < els.length; i++){ var v = dict(els[i].getAttribute("data-i18n")); if (v != null) els[i].textContent = v; }
   var hels = document.querySelectorAll("[data-i18n-html]");
   for (var j = 0; j < hels.length; j++){ var h = dict(hels[j].getAttribute("data-i18n-html")); if (h != null) hels[j].innerHTML = h; }
-  var lb = document.querySelectorAll(".langtoggle button");
-  for (var k = 0; k < lb.length; k++) lb[k].setAttribute("aria-pressed", lb[k].dataset.lang === LANG ? "true" : "false");
+  var ls = document.getElementById("langSel");
+  if (ls && ls.value !== LANG) ls.value = LANG;
   document.title = dict("meta.title");
   for (var m = 0; m < LANG_HOOKS.length; m++) LANG_HOOKS[m]();
 }
@@ -916,7 +929,7 @@ function applyLang(){
 (function(){
   var btns = document.querySelectorAll(".langtoggle button");
   for (var i = 0; i < btns.length; i++)
-    btns[i].addEventListener("click", function(){ setLang(this.dataset.lang); });
+    btns[i].addEventListener("click", function(){ setLang(this.dataset.lang); });   // legacy buttons, if any
 })();
 
 /* ======================= view routing ======================= */
@@ -2041,6 +2054,9 @@ window.addEventListener("hashchange", routeFromHash);
 
 /* ======================= boot ======================= */
 routeFromHash();
+var langSelEl = document.getElementById("langSel");
+if (langSelEl) langSelEl.addEventListener("change", function(){ setLang(this.value); });
+
 applyLang();      // paint at once with the inline English dictionary
 setLang(LANG);    // then fetch the detected language and re-apply
 </script>
