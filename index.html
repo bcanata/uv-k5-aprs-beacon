@@ -2108,11 +2108,16 @@ window.addEventListener("hashchange", routeFromHash);
   function pause(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
 
   async function monLoop(){
+    var lastFlagCheck = Date.now();
     while(running){
       if(!K5.sessionOpen() || !t){ break; }
       // Only the visible section may read the shared port, otherwise two
       // sections race for the same reply bytes.
       if(!$("view-aprs").classList.contains("active")){ await pause(200); continue; }
+      // Someone can switch APRS off at the radio, or from the Control tab,
+      // while this tab sits open looking perfectly healthy. Re-read the flag
+      // periodically so the banner reflects the radio, not our last guess.
+      if(Date.now() - lastFlagCheck > 10000){ lastFlagCheck = Date.now(); await apCheckAprs(); }
       // take the shared port lock: a bare read here used to swallow the reply
       // to another section's handshake when you switched tabs mid-read
       var chunk;
@@ -2185,6 +2190,9 @@ window.addEventListener("hashchange", routeFromHash);
   var lastTo=load(TO_KEY,null); if(lastTo && typeof lastTo==="string") $("amTo").value=lastTo;
 
   onView(async function(name){
+    // Already attached: the flag may have changed while we were away (turned
+    // off from the Control tab, or at the radio itself), so re-check it.
+    if (name === "aprs" && connected) { await apCheckAprs(); return; }
     if (name !== "aprs" || connected || !K5.sessionOpen()) return;
     try {
       t = await K5.acquire(); if (!t) return;
