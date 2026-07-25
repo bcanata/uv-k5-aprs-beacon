@@ -93,7 +93,11 @@ var K5 = (function () {
       name: "Web Serial",
       isSerial: true,
       connect: async function () {
-        port = await navigator.serial.requestPort();
+        // Reuse a port the user already granted, so the picker appears once per
+        // browser rather than once per section.
+        var known = [];
+        try { known = await navigator.serial.getPorts(); } catch (e) {}
+        port = (known && known.length === 1) ? known[0] : await navigator.serial.requestPort();
         await port.open({ baudRate: 38400 });
         writer = port.writable.getWriter();
         reader = port.readable.getReader();
@@ -150,7 +154,9 @@ var K5 = (function () {
       name: "WebUSB",
       isSerial: false,
       connect: async function (preDevice) {
-        dev = preDevice || await navigator.usb.requestDevice({ filters: filters });
+        var known = [];
+        if (!preDevice) { try { known = await navigator.usb.getDevices(); } catch (e) {} }
+        dev = preDevice || (known.length === 1 ? known[0] : await navigator.usb.requestDevice({ filters: filters }));
         await dev.open();
         if (dev.configuration === null) await dev.selectConfiguration(1);
         var iface = dev.configuration.interfaces[0];
@@ -549,7 +555,39 @@ var K5 = (function () {
     return null;
   }
 
+  // ---- one connection for the whole page --------------------------------
+  // Every section used to open its own port. Web Serial hands a port to a
+  // single owner, so after connecting in one section every other section got
+  // "the serial port is already open" and the only way out was closing the
+  // browser (uv-k5-aprs-beacon#2). The port is now opened once and shared;
+  // release() is what the Disconnect buttons call.
+  var sessionT = null;
+  var connHooks = [];
+  function notifyConn(){
+    for (var i = 0; i < connHooks.length; i++) {
+      try { connHooks[i](!!sessionT); } catch (e) {}
+    }
+  }
+  function onConn(fn){ connHooks.push(fn); }
+  function sessionOpen(){ return !!sessionT; }
+  async function acquire(){
+    if (sessionT) return sessionT;              // already connected elsewhere
+    var t = pickTransport();
+    if (!t) return null;
+    await t.connect();                          // may throw; caller reports it
+    sessionT = t;
+    notifyConn();
+    return sessionT;
+  }
+  async function release(){
+    var t = sessionT;
+    sessionT = null;                            // drop it first: hooks must see closed
+    if (t) { try { await t.disconnect(); } catch (e) {} }
+    notifyConn();
+  }
+
   return {
+    acquire: acquire, release: release, sessionOpen: sessionOpen, onConn: onConn,
     crc16: crc16, xorApply: xorApply, frameRaw: frameRaw, frameCommand: frameCommand,
     extractFrame: extractFrame, ch341Divisor: ch341Divisor,
     makeWebSerial: makeWebSerial, makeWebUsb: makeWebUsb, Radio: Radio,

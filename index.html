@@ -679,6 +679,8 @@ var T = {
         portBusy: "The serial port is already open — close any other browser tab (or app) using the radio, then reload and try again.",
         skipped: "Skipped.",
         needRadio: "No radio connected — go back to step 1 and connect it first.",
+        disconnect: "Disconnect",
+        released: "Disconnected — the port is free for the other sections.",
         noAnswer: "Connected, but the radio didn't answer. Is it ON (not in flash mode)?",
         connected: function(v){ return "Connected. Radio firmware: " + v; },
         connFailed: "Connection failed.",
@@ -937,6 +939,8 @@ var T = {
         portBusy: "Seri port zaten açık — telsizi kullanan diğer sekmeleri (veya uygulamaları) kapatın, sayfayı yenileyip tekrar deneyin.",
         skipped: "Atlandı.",
         needRadio: "Telsiz bağlı değil — 1. adıma dönüp bağlan.",
+        disconnect: "Bağlantıyı Kes",
+        released: "Bağlantı kesildi — port diğer bölümler için serbest.",
         noAnswer: "Bağlandı ama telsiz yanıt vermedi. Açık mı (yükleme modunda değil)?",
         connected: function(v){ return "Bağlandı. Telsiz firmware: " + v; },
         connFailed: "Bağlantı başarısız.",
@@ -1214,13 +1218,20 @@ window.addEventListener("hashchange", routeFromHash);
   onLang(fwShowInfo);
   fwLoadManifest();
 
+  K5.onConn(function(open){
+    if (open) return;
+    radio = null;
+    $("btnConnect").textContent = D().install.s1.btn; $("btnConnect").classList.remove("connected");
+  });
+
   $("btnConnect").addEventListener("click", async function(){
     var S = D().install.st;
-    var t = K5.pickTransport();
-    if (!t){ st("stConnect", S.noSerial, "err"); return; }
+    if (K5.sessionOpen()){ await K5.release(); st("stConnect", S.released, ""); return; }
     st("stConnect", S.selectAdapter);
+    var t = null;
     try {
-      await t.connect();
+      t = await K5.acquire();
+      if (!t){ st("stConnect", S.noSerial, "err"); return; }
       radio = new K5.Radio(t);
       var ver = null;
       for (var attempt = 0; attempt < 3 && !ver; attempt++) ver = await radio.hello();
@@ -1245,6 +1256,7 @@ window.addEventListener("hashchange", routeFromHash);
         return;
       }
       st("stConnect", S.connected(ver), "ok");
+      $("btnConnect").textContent = S.disconnect; $("btnConnect").classList.add("connected");
       stepState("s1","done"); activate("s2"); $("btnBackup").disabled = false;
     } catch(e){
       var m = (e && e.message) ? e.message : String(e);
@@ -1728,23 +1740,33 @@ window.addEventListener("hashchange", routeFromHash);
   $("rcBw").addEventListener("change",  function(){ if (radio) radio.setBandwidth(parseInt(this.value, 10)); });
   $("rcMod").addEventListener("change", function(){ if (radio) radio.setModulation(parseInt(this.value, 10)); });
 
-  onLang(function(){ rcConnect.textContent = connected ? D().control.connected : D().control.connect; });
+  onLang(function(){ rcConnect.textContent = connected ? D().install.st.disconnect : D().control.connect; });
+
+  // the port is shared: if any section releases it, drop our state too
+  K5.onConn(function(open){
+    if (open) return;
+    connected = false; radio = null; running = false;
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+    rcConnect.textContent = D().control.connect; rcConnect.classList.remove("connected");
+    $("rcPanel").style.display = "none";
+    rcSt("");
+  });
 
   rcConnect.addEventListener("click", async function(){
     var S = D().control.st;
-    if (connected){ return; }
-    var t = K5.pickTransport();
-    if (!t){ rcSt(D().beacon.st.neither, "err"); return; }
+    if (connected || K5.sessionOpen()){ await K5.release(); return; }
     rcSt(S.connecting);
+    var t = null;
     try {
-      await t.connect();
+      t = await K5.acquire();
+      if (!t){ rcSt(D().beacon.st.neither, "err"); return; }
       radio = new K5.Radio(t);
       var ver = await radio.hello();
       var s = ver ? await radio.getState() : null;
       if (!s){ rcSt(S.needFw, "err"); try { await t.disconnect(); } catch(e){} radio = null; return; }
       connected = true;
       rcSt(S.connected(ver), "ok");
-      rcConnect.textContent = D().control.connected; rcConnect.classList.add("connected");
+      rcConnect.textContent = D().install.st.disconnect; rcConnect.classList.add("connected");
       $("rcPanel").style.display = "block";
       renderState(s);
       running = true; loop();
@@ -1851,15 +1873,16 @@ window.addEventListener("hashchange", routeFromHash);
 
   chConnect.addEventListener("click", async function(){
     var S=D().chan.st;
-    if(connected) return;
-    var t=K5.pickTransport(); if(!t){ chSt(D().beacon.st.neither,"err"); return; }
+    if(connected || K5.sessionOpen()){ await K5.release(); return; }
     chSt(S.connecting);
+    var t=null;
     try{
-      await t.connect(); radio=new K5.Radio(t);
+      t = await K5.acquire(); if(!t){ chSt(D().beacon.st.neither,"err"); return; }
+      radio=new K5.Radio(t);
       var ver=await radio.hello();
       if(!ver){ chSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} radio=null; return; }
       connected=true; chSt(S.connected(ver),"ok");
-      chConnect.textContent=D().chan.connected; chConnect.classList.add("connected");
+      chConnect.textContent=D().install.st.disconnect; chConnect.classList.add("connected");
       $("chPanel").style.display="block";
     }catch(e){
       var m=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(m);
@@ -1899,7 +1922,15 @@ window.addEventListener("hashchange", routeFromHash);
     channels=list; renderTable(); chProg(S.importDone(list.length),"ok");
   });
 
-  onLang(function(){ chConnect.textContent = connected ? D().chan.connected : D().chan.connect; });
+  onLang(function(){ chConnect.textContent = connected ? D().install.st.disconnect : D().chan.connect; });
+
+  K5.onConn(function(open){
+    if (open) return;
+    connected = false; radio = null;
+    chConnect.textContent = D().chan.connect; chConnect.classList.remove("connected");
+    $("chPanel").style.display = "none";
+    chSt("");
+  });
 })();
 
 /* ======================= SETTINGS EDITOR ======================= */
@@ -2007,15 +2038,17 @@ window.addEventListener("hashchange", routeFromHash);
   }
 
   seConnect.addEventListener("click", async function(){
-    var S=D().set.st; if(connected) return;
-    var t=K5.pickTransport(); if(!t){ seSt(D().beacon.st.neither,"err"); return; }
+    var S=D().set.st;
+    if(connected || K5.sessionOpen()){ await K5.release(); return; }
     seSt(S.connecting);
+    var t=null;
     try{
-      await t.connect(); radio=new K5.Radio(t);
+      t = await K5.acquire(); if(!t){ seSt(D().beacon.st.neither,"err"); return; }
+      radio=new K5.Radio(t);
       var ver=await radio.hello();
       if(!ver){ seSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} radio=null; return; }
       connected=true; seSt(S.connected(ver),"ok");
-      seConnect.textContent=D().set.connected; seConnect.classList.add("connected");
+      seConnect.textContent=D().install.st.disconnect; seConnect.classList.add("connected");
       $("sePanel").style.display="block";
     }catch(e){
       var m=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(m);
@@ -2062,8 +2095,16 @@ window.addEventListener("hashchange", routeFromHash);
     $("seRestore").disabled=false;
   });
 
+  K5.onConn(function(open){
+    if (open) return;
+    connected = false; radio = null;
+    seConnect.textContent = D().set.connect; seConnect.classList.remove("connected");
+    $("sePanel").style.display = "none";
+    seSt("");
+  });
+
   onLang(function(){
-    seConnect.textContent = connected ? D().set.connected : D().set.connect;
+    seConnect.textContent = connected ? D().install.st.disconnect : D().set.connect;
     buildForm();
   });
 })();
@@ -2150,15 +2191,16 @@ window.addEventListener("hashchange", routeFromHash);
   }
 
   $("apConnect").addEventListener("click", async function(){
-    var S=D().ap.st; if(connected) return;
-    t=K5.pickTransport(); if(!t){ apSt(D().beacon.st.neither,"err"); return; }
+    var S=D().ap.st;
+    if(connected || K5.sessionOpen()){ await K5.release(); return; }
     apSt(S.connecting);
     try{
-      await t.connect(); radio=new K5.Radio(t);
+      t = await K5.acquire(); if(!t){ apSt(D().beacon.st.neither,"err"); return; }
+      radio=new K5.Radio(t);
       var ver=await radio.hello();
       if(!ver){ apSt(D().install.st.noAnswer,"err"); try{await t.disconnect();}catch(e){} t=null; return; }
       connected=true; apSt(S.connected(ver),"ok");
-      $("apConnect").textContent=D().ap.connected; $("apConnect").classList.add("connected");
+      $("apConnect").textContent=D().install.st.disconnect; $("apConnect").classList.add("connected");
       running=true; monLoop();
     }catch(e){
       var msg=(e&&e.message)?e.message:String(e), busy=/open|in use|already|network/i.test(msg);
@@ -2192,8 +2234,15 @@ window.addEventListener("hashchange", routeFromHash);
 
   var lastTo=load(TO_KEY,null); if(lastTo && typeof lastTo==="string") $("amTo").value=lastTo;
 
+  K5.onConn(function(open){
+    if (open) return;
+    connected = false; running = false; radio = null; t = null;
+    $("apConnect").textContent = D().ap.connect; $("apConnect").classList.remove("connected");
+    apSt("");
+  });
+
   onLang(function(){
-    $("apConnect").textContent = connected ? D().ap.connected : D().ap.connect;
+    $("apConnect").textContent = connected ? D().install.st.disconnect : D().ap.connect;
     $("amText").placeholder = D().ap.msgPh;
     $("amTo").placeholder = D().ap.toPh;
     renderLog(); renderChat();
