@@ -79,7 +79,7 @@ T.tr = {
         codeintro: "<b>Tuş takımına girilecek kodları üret</b> (konum, çağrı işareti, mesaj):",
         codebtn: "Kod Aracını Aç"
       },
-      fine: "Açık kaynak. Firmware & araçlar: UV-K5 APRS sürümü (TA1JS). macOS'ta kablo algılanmazsa WCH CH34x sürücüsünü kurun. iOS tarayıcıları USB'ye erişemez — masaüstü ya da USB-OTG kablolu Android Chrome kullanın (yükleme masaüstü gerektirir).",
+      fine: "Açık kaynak. Firmware & araçlar: UV-K5 APRS sürümü (TA1JS). macOS'ta kablo algılanmazsa <a href='https://www.wch-ic.com/downloads/category/67.html'>WCH CH34x</a> sürücüsünü kurun. iOS tarayıcıları USB'ye erişemez — masaüstü ya da USB-OTG kablolu Android Chrome kullanın (yükleme masaüstü gerektirir).",
       posPlaceholder: "GPS'imi Kullan'a bas",
       on: "Açık", off: "Kapalı", min: "dk",
       skip: "Bu adımı atla",

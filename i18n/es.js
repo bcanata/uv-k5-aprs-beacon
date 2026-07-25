@@ -79,7 +79,7 @@ T.es = {
         codeintro: "<b>Generar códigos para teclear en la radio</b> (posición, indicativo, mensaje):",
         codebtn: "Abrir herramienta de códigos"
       },
-      fine: "Código abierto. Firmware y herramientas: la edición UV-K5 APRS (TA1JS). En macOS instala el driver WCH CH34x si no se detecta el cable. Los navegadores de iOS no pueden acceder al USB — usa una computadora, o Chrome en Android con un cable USB-OTG (grabar sigue necesitando una computadora).",
+      fine: "Código abierto. Firmware y herramientas: la edición UV-K5 APRS (TA1JS). En macOS instala el driver <a href='https://www.wch-ic.com/downloads/category/67.html'>WCH CH34x</a> si no se detecta el cable. Los navegadores de iOS no pueden acceder al USB — usa una computadora, o Chrome en Android con un cable USB-OTG (grabar sigue necesitando una computadora).",
       posPlaceholder: "pulsa Usar mi GPS",
       on: "Activado", off: "Desactivado", min: "min",
       skip: "Omitir este paso",

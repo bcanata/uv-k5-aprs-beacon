@@ -79,7 +79,7 @@ T.pl = {
         codeintro: "<b>Wygeneruj kody do wpisania na klawiaturze</b> (pozycja, znak wywoławczy, wiadomość):",
         codebtn: "Otwórz generator kodów"
       },
-      fine: "Otwarte źródła. Firmware i narzędzia: edycja UV-K5 APRS (TA1JS). W macOS zainstaluj sterownik WCH CH34x, jeśli kabel nie jest wykrywany. Przeglądarki iOS nie mają dostępu do USB — użyj komputera albo Chrome na Androidzie z kablem USB-OTG (wgranie firmware nadal wymaga komputera).",
+      fine: "Otwarte źródła. Firmware i narzędzia: edycja UV-K5 APRS (TA1JS). W macOS zainstaluj sterownik <a href='https://www.wch-ic.com/downloads/category/67.html'>WCH CH34x</a>, jeśli kabel nie jest wykrywany. Przeglądarki iOS nie mają dostępu do USB — użyj komputera albo Chrome na Androidzie z kablem USB-OTG (wgranie firmware nadal wymaga komputera).",
       posPlaceholder: "naciśnij Użyj mojego GPS",
       on: "Wł.", off: "Wył.", min: "min",
       skip: "Pomiń ten krok",
