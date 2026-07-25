@@ -1,16 +1,16 @@
 {
   "source": "bcanata/uv-k5-firmware-ta1js",
   "commit": "main",
-  "published": "2026-07-25T13:15:20Z",
+  "published": "2026-07-25T15:06:57Z",
   "images": {
     "amateur": {
       "file": "firmware/ta1js-aprs-amateur.bin",
-      "bytes": 61372,
+      "bytes": 61288,
       "label": "Amateur bands only"
     },
     "allband": {
       "file": "firmware/ta1js-aprs-allband.bin",
-      "bytes": 61176,
+      "bytes": 61092,
       "label": "All bands"
     }
   }
