@@ -1743,7 +1743,7 @@ window.addEventListener("hashchange", routeFromHash);
   onLang(function(){ chConnect.textContent = connected ? D().install.st.disconnect : D().chan.connect; });
 
   onView(async function(name){
-    if (name !== "chan" || connected || !K5.sessionOpen()) return;
+    if (name !== "channels" || connected || !K5.sessionOpen()) return;
     try {
       var t = await K5.acquire(); if (!t) return;
       radio = new K5.Radio(t);
@@ -1926,7 +1926,7 @@ window.addEventListener("hashchange", routeFromHash);
   });
 
   onView(async function(name){
-    if (name !== "set" || connected || !K5.sessionOpen()) return;
+    if (name !== "settings" || connected || !K5.sessionOpen()) return;
     try {
       var t = await K5.acquire(); if (!t) return;
       radio = new K5.Radio(t);
