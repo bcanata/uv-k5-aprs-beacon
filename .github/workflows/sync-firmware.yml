@@ -1,0 +1,70 @@
+name: Sync firmware from releases
+
+# Pulls the newest firmware images out of the firmware repo's "latest" release
+# and commits them here, so the installer can flash a same-origin file.
+#
+# Why not fetch the release straight from the browser: GitHub's release-asset
+# download does not send an Access-Control-Allow-Origin header on the final
+# response, and the unauthenticated API is rate limited per client IP. Doing the
+# fetch here, server side, avoids both.
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'      # every 6 hours
+  workflow_dispatch:             # or on demand, right after a firmware release
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      SRC_REPO: bcanata/uv-k5-firmware-ta1js
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the latest release assets
+        run: |
+          set -eu
+          mkdir -p firmware
+          meta=$(gh api "repos/$SRC_REPO/releases/tags/latest")
+          sha=$(printf '%s' "$meta" | jq -r '.target_commitish // ""')
+          published=$(printf '%s' "$meta" | jq -r '.published_at')
+          for name in ta1js-aprs-amateur.bin ta1js-aprs-allband.bin; do
+            id=$(printf '%s' "$meta" | jq -r --arg n "$name" '.assets[] | select(.name==$n) | .id')
+            [ -n "$id" ] || { echo "::error::$name missing from the release"; exit 1; }
+            gh api -H "Accept: application/octet-stream" \
+              "repos/$SRC_REPO/releases/assets/$id" > "firmware/$name"
+            size=$(stat -c%s "firmware/$name")
+            echo "$name: $size bytes"
+            # a truncated or error-page download would be far off 60 KB
+            [ "$size" -gt 40000 ] && [ "$size" -le 61440 ] || {
+              echo "::error::$name is $size bytes, not a plausible UV-K5 image"; exit 1; }
+          done
+          jq -n --arg published "$published" --arg sha "$sha" \
+                --arg amateur_size "$(stat -c%s firmware/ta1js-aprs-amateur.bin)" \
+                --arg allband_size "$(stat -c%s firmware/ta1js-aprs-allband.bin)" \
+                --arg repo "$SRC_REPO" \
+            '{source: $repo, commit: $sha, published: $published,
+              images: {
+                amateur: {file: "firmware/ta1js-aprs-amateur.bin", bytes: ($amateur_size|tonumber),
+                          label: "Amateur bands only"},
+                allband: {file: "firmware/ta1js-aprs-allband.bin", bytes: ($allband_size|tonumber),
+                          label: "All bands"}
+              }}' > firmware/manifest.json
+          cat firmware/manifest.json
+
+      - name: Commit if anything changed
+        run: |
+          set -eu
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add firmware
+          if git diff --cached --quiet; then
+            echo "already up to date"
+          else
+            git commit -m "Sync firmware images from $SRC_REPO latest release"
+            git push
+          fi

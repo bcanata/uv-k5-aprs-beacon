@@ -132,6 +132,10 @@
   .bub .who{display:block;font:600 .58rem/1 ui-monospace,Menlo,monospace;letter-spacing:.04em;opacity:.7;margin-bottom:.2rem;}
   .bub .tm{display:block;font:400 .55rem/1 ui-monospace,Menlo,monospace;opacity:.5;margin-top:.25rem;text-align:right;}
   .bub .ack{margin-left:.35rem;opacity:.95;font-size:.7rem;}
+  .fwpick{display:flex;flex-direction:column;gap:.4rem;margin:.6rem 0 .3rem;}
+  .fwpick label{display:flex;gap:.45rem;align-items:baseline;font-size:.9rem;cursor:pointer;}
+  .fwpick input{margin-top:.2rem;flex:0 0 auto;}
+  .fwpick span{opacity:.75;}
   .bub.in{align-self:flex-start;background:var(--field-bg);border:1px solid var(--line);}
   .bub.out{align-self:flex-end;background:var(--accent);color:var(--accent-ink);}
   .chat .empty{margin:auto;color:var(--muted);font-size:.85rem;}
@@ -267,6 +271,13 @@
       <li class="step" id="s5">
         <h2 data-i18n="install.s5.h"></h2>
         <p><span data-i18n="install.s5.p"></span> <span id="flashDesktopOnly" style="display:none" data-i18n-html="install.s5.desktoponly"></span></p>
+        <div class="fwpick">
+          <label><input type="radio" name="fwband" value="amateur" checked>
+                 <b data-i18n="install.s5.amateurT"></b><span data-i18n="install.s5.amateurD"></span></label>
+          <label><input type="radio" name="fwband" value="allband">
+                 <b data-i18n="install.s5.allbandT"></b><span data-i18n="install.s5.allbandD"></span></label>
+        </div>
+        <p class="fine" id="fwInfo"></p>
         <button class="act" id="btnFlash" disabled data-i18n="install.s5.btn"></button>
         <div class="bar" id="barFlash"><i></i></div>
         <p class="status" id="stFlash"></p>
@@ -539,7 +550,41 @@
 
 /* ======================= firmware image ======================= */
 var FW_VERSION = "*TA1JS v1.2";   // must start with '*'
-var FW_URL = "ta1js.bin";
+// Images are synced into this repo from the firmware repo's "latest" release by
+// .github/workflows/sync-firmware.yml, so they are same-origin: GitHub's
+// release-asset download sends no Access-Control-Allow-Origin header on the
+// final response, and its unauthenticated API is rate limited per client IP.
+var FW_MANIFEST = "firmware/manifest.json";
+var FW_FALLBACK = "ta1js.bin";    // bundled image, used if the manifest is missing
+var fwManifest = null;
+
+function fwBandChoice(){
+  var el = document.querySelector('input[name=fwband]:checked');
+  return (el && el.value) || "amateur";
+}
+
+function fwPick(){
+  var band = fwBandChoice();
+  if (fwManifest && fwManifest.images && fwManifest.images[band])
+    return fwManifest.images[band];
+  return { file: FW_FALLBACK, bytes: 0 };
+}
+
+function fwShowInfo(){
+  var el = document.getElementById("fwInfo"); if (!el) return;
+  var S = D().install.st, img = fwPick();
+  el.textContent = (fwManifest && img.bytes)
+    ? S.fwFrom(Math.round(img.bytes / 1024), (fwManifest.published || "").slice(0, 10))
+    : S.fwBundled;
+}
+
+async function fwLoadManifest(){
+  try {
+    var r = await fetch(FW_MANIFEST, { cache: "no-store" });
+    if (r.ok) fwManifest = await r.json();
+  } catch(e){ fwManifest = null; }
+  fwShowInfo();
+}
 
 /* ======================= i18n dictionary ======================= */
 var T = {
@@ -608,12 +653,14 @@ var T = {
       s2: { h: "Back up your radio", p: "We save the full EEPROM and the <b>factory calibration</b> (0x1E00–0x1FFF, unique to your radio — irreplaceable). Keep these files safe.", btn: "Back Up & Download" },
       s3: { h: "Wipe old settings", p: "The radio's current settings use a different layout that would confuse the new firmware, so we clear them (0x0000–0x1DFF). <b>Calibration is preserved.</b> Run this only after you've saved the backup above.", btn: "Wipe Settings" },
       s4: { h: "Enter flash mode", p: "Turn the radio <b>OFF</b>. Then turn it <b>ON while holding PTT</b> — the flashlight LED lights up. Leave the cable plugged in. Then confirm:", btn: "Confirm Flash Mode" },
-      s5: { h: "Flash the firmware", p: "This writes the APRS firmware (~59 KB). Do not unplug or power off during flashing.", desktoponly: "<b>Desktop only</b> — open this page on a computer to flash.", btn: "Flash Firmware" },
+      s5: { h: "Flash the firmware", p: "Choose which bands the radio may use, then flash. Do not unplug or power off during flashing.", desktoponly: "<b>Desktop only</b> — open this page on a computer to flash.", btn: "Flash Firmware",
+            amateurT: "Amateur bands only", amateurD: " — VFO and TX limited to the amateur allocations. Recommended.",
+            allbandT: "All bands", allbandD: " — no band restriction; transmitting outside your licence is your responsibility." },
       s6: { h: "Configure your station", p: "The radio rebooted into the new firmware. Enter your details — we write them straight into the radio.", gps: "Use my GPS", save: "Write to Radio" },
       f: { call: "Callsign", ssid: "SSID", msgto: "Message target (optional)", intv: "Beacon interval", aprson: "Listen on boot", pos: "Position" },
       s7: {
         h: "Done — how to use it",
-        p: "Your radio is now an APRS station. Tune to <b>144.800 MHz</b>, set menu <b>APRS → ON</b> to listen, and use <b>TX</b> to beacon. Incoming messages to your callsign pop up on screen (any key clears them). Menu group: APRS, Intv, Call, SSID, Loc, Cmnt, MsgTo, Msg, Send, TX. VFO/TX are limited to amateur bands.",
+        p: "Your radio is now an APRS station. Tune to <b>144.800 MHz</b>, set menu <b>APRS → ON</b> to listen, and press <b>BEACON</b> to transmit your position. Incoming messages to your callsign pop up on screen (any key clears them). The APRS group is the <b>first ten menu items</b>: APRS, Intv, Call, SSID, Loc, Cmnt, MsgTo, Msg, Send, BEACON. <b>Send</b> and <b>BEACON</b> fire on a single MENU press; in the text fields MENU saves whatever you typed and EXIT backspaces.",
         beacontitle: "<b>Beacon live GPS from this device:</b>",
         beaconbtn: "Open Web Beacon",
         codeintro: "<b>Generate codes to type on the keypad</b> (location, callsign, message):",
@@ -646,6 +693,8 @@ var T = {
         genericErr: function(e){ return "Error: " + e; },
         downloading: "Downloading firmware image…",
         cannotLoad: function(u,s){ return "cannot load " + u + " (" + s + ")"; },
+        fwFrom: function(kb,date){ return "Firmware: " + kb + " KB, built " + date + " (synced from the latest release)."; },
+        fwBundled: "Firmware: using the copy bundled with this page.",
         flashing: function(n){ return "Flashing " + n + " bytes… do not disconnect."; },
         flashingChunk: function(d,t){ return "Flashing chunk " + d + "/" + t + "…"; },
         flashComplete: "Flash complete! The radio is rebooting into the new firmware.",
@@ -860,12 +909,14 @@ var T = {
       s2: { h: "Telsizini yedekle", p: "Tüm EEPROM'u ve <b>fabrika kalibrasyonunu</b> (0x1E00–0x1FFF, telsizinize özel — yeri doldurulamaz) kaydederiz. Bu dosyaları güvende tutun.", btn: "Yedekle ve İndir" },
       s3: { h: "Eski ayarları temizle", p: "Telsizin mevcut ayarları farklı bir düzende olduğundan yeni firmware'i şaşırtır; bu yüzden onları temizleriz (0x0000–0x1DFF). <b>Kalibrasyon korunur.</b> Bunu yalnızca yukarıdaki yedeği kaydettikten sonra çalıştırın.", btn: "Ayarları Temizle" },
       s4: { h: "Yükleme moduna gir", p: "Telsizi <b>KAPAT</b>. Sonra <b>PTT'ye basılı tutarak AÇ</b> — el feneri LED'i yanar. Kabloyu takılı bırak. Sonra onayla:", btn: "Yükleme Modunu Onayla" },
-      s5: { h: "Firmware'i yükle", p: "Bu, APRS firmware'ini (~59 KB) yazar. Yükleme sırasında kabloyu çıkarma veya kapatma.", desktoponly: "<b>Yalnızca masaüstü</b> — yüklemek için bu sayfayı bilgisayarda açın.", btn: "Firmware'i Yükle" },
+      s5: { h: "Firmware'i yükle", p: "Telsizin hangi bantları kullanabileceğini seç, sonra yükle. Yükleme sırasında kabloyu çıkarma veya kapatma.", desktoponly: "<b>Yalnızca masaüstü</b> — yüklemek için bu sayfayı bilgisayarda açın.", btn: "Firmware'i Yükle",
+            amateurT: "Yalnızca amatör bantlar", amateurD: " — VFO ve TX amatör tahsislerle sınırlı. Önerilen.",
+            allbandT: "Tüm bantlar", allbandD: " — bant kısıtlaması yok; lisansınız dışında yayın yapmak sizin sorumluluğunuzdadır." },
       s6: { h: "İstasyonunu yapılandır", p: "Telsiz yeni firmware ile yeniden başladı. Bilgilerini gir — doğrudan telsize yazarız.", gps: "GPS'imi Kullan", save: "Telsize Yaz" },
       f: { call: "Çağrı işareti", ssid: "SSID", msgto: "Mesaj hedefi (isteğe bağlı)", intv: "Beacon aralığı", aprson: "Açılışta dinle", pos: "Konum" },
       s7: {
         h: "Tamam — nasıl kullanılır",
-        p: "Telsiziniz artık bir APRS istasyonu. <b>144.800 MHz</b>'e ayarlayın, dinlemek için menüden <b>APRS → ON</b> yapın ve beacon için <b>TX</b> kullanın. Çağrı işaretinize gelen mesajlar ekranda belirir (herhangi bir tuş kapatır). Menü grubu: APRS, Intv, Call, SSID, Loc, Cmnt, MsgTo, Msg, Send, TX. VFO/TX amatör bantlarla sınırlıdır.",
+        p: "Telsiziniz artık bir APRS istasyonu. <b>144.800 MHz</b>'e ayarlayın, dinlemek için menüden <b>APRS → ON</b> yapın, konumunuzu yayınlamak için <b>BEACON</b>'a basın. Çağrı işaretinize gelen mesajlar ekranda belirir (herhangi bir tuş kapatır). APRS grubu menünün <b>ilk on öğesi</b>: APRS, Intv, Call, SSID, Loc, Cmnt, MsgTo, Msg, Send, BEACON. <b>Send</b> ve <b>BEACON</b> tek MENU basışıyla çalışır; metin alanlarında MENU yazdığınız kadarını kaydeder, EXIT geri siler.",
         beacontitle: "<b>Bu cihazdan canlı GPS beacon gönder:</b>",
         beaconbtn: "Web Beacon'ı Aç",
         codeintro: "<b>Tuş takımına girilecek kodları üret</b> (konum, çağrı işareti, mesaj):",
@@ -898,6 +949,8 @@ var T = {
         genericErr: function(e){ return "Hata: " + e; },
         downloading: "Firmware görüntüsü indiriliyor…",
         cannotLoad: function(u,s){ return u + " yüklenemedi (" + s + ")"; },
+        fwFrom: function(kb,date){ return "Firmware: " + kb + " KB, " + date + " derlemesi (son sürümden alındı)."; },
+        fwBundled: "Firmware: bu sayfayla gelen kopya kullanılıyor.",
         flashing: function(n){ return n + " bayt yükleniyor… bağlantıyı kesme."; },
         flashingChunk: function(d,t){ return "Parça " + d + "/" + t + " yükleniyor…"; },
         flashComplete: "Yükleme tamam! Telsiz yeni firmware ile yeniden başlıyor.",
@@ -1144,6 +1197,14 @@ window.addEventListener("hashchange", routeFromHash);
   bindSkip("skip5", "s5", "stFlash",    "s6", "btnSave");
   bindSkip("skip6", "s6", "stSave",     "s7", null);
 
+  // firmware images are synced from the release; refresh the note when the
+  // band choice or the language changes
+  var fwRadios = document.querySelectorAll('input[name=fwband]');
+  for (var fi = 0; fi < fwRadios.length; fi++)
+    fwRadios[fi].addEventListener("change", fwShowInfo);
+  onLang(fwShowInfo);
+  fwLoadManifest();
+
   $("btnConnect").addEventListener("click", async function(){
     var S = D().install.st;
     var t = K5.pickTransport();
@@ -1240,8 +1301,9 @@ window.addEventListener("hashchange", routeFromHash);
     if (!radio || K5.isMobile) return;
     $("btnFlash").disabled = true; st("stFlash", S.downloading);
     try {
-      var resp = await fetch(FW_URL, {cache:"no-store"});
-      if (!resp.ok) throw new Error(S.cannotLoad(FW_URL, resp.status));
+      var img = fwPick();
+      var resp = await fetch(img.file, {cache:"no-store"});
+      if (!resp.ok) throw new Error(S.cannotLoad(img.file, resp.status));
       var fw = new Uint8Array(await resp.arrayBuffer());
       st("stFlash", S.flashing(fw.length));
       await radio.flash(fw, FW_VERSION, function(d,t){ bar("barFlash", d, t); st("stFlash", S.flashingChunk(d, t)); });
