@@ -934,6 +934,9 @@ function applyLang(){
 
 /* ======================= view routing ======================= */
 var VIEWS = ["install", "beacon", "code", "control", "channels", "settings", "aprs"];
+var VIEW_HOOKS = [];
+function onView(fn){ VIEW_HOOKS.push(fn); }
+
 function showView(name){
   if (VIEWS.indexOf(name) < 0) name = "install";
   for (var i = 0; i < VIEWS.length; i++){
@@ -941,6 +944,10 @@ function showView(name){
     $("tab-" + VIEWS[i]).classList.toggle("active", VIEWS[i] === name);
   }
   window.scrollTo(0, 0);
+  // A section that becomes visible while the shared port is already open
+  // attaches to it, so it does not sit there saying "Connect Radio" when the
+  // radio is in fact connected (uv-k5-aprs-beacon#2).
+  for (var h = 0; h < VIEW_HOOKS.length; h++){ try { VIEW_HOOKS[h](name); } catch(e){} }
 }
 function routeFromHash(){ showView((location.hash || "").replace("#", "")); }
 window.addEventListener("hashchange", routeFromHash);
@@ -1537,6 +1544,23 @@ window.addEventListener("hashchange", routeFromHash);
   onLang(function(){ rcConnect.textContent = connected ? D().install.st.disconnect : D().control.connect; });
 
   // the port is shared: if any section releases it, drop our state too
+  onView(async function(name){
+    if (name !== "control" || connected || !K5.sessionOpen()) return;
+    try {
+      var t = await K5.acquire(); if (!t) return;
+      radio = new K5.Radio(t);
+      var ver = await radio.hello();
+      var s0 = ver ? await radio.getState() : null;
+      if (!s0){ radio = null; return; }
+      connected = true;
+      rcSt(D().control.st.connected(ver), "ok");
+      rcConnect.textContent = D().install.st.disconnect; rcConnect.classList.add("connected");
+      $("rcPanel").style.display = "block";
+      renderState(s0);
+      running = true; loop();
+    } catch(e){ radio = null; }
+  });
+
   K5.onConn(function(open){
     if (open) return;
     connected = false; radio = null; running = false;
@@ -1718,6 +1742,18 @@ window.addEventListener("hashchange", routeFromHash);
 
   onLang(function(){ chConnect.textContent = connected ? D().install.st.disconnect : D().chan.connect; });
 
+  onView(async function(name){
+    if (name !== "chan" || connected || !K5.sessionOpen()) return;
+    try {
+      var t = await K5.acquire(); if (!t) return;
+      radio = new K5.Radio(t);
+      var ver = await radio.hello(); if (!ver){ radio = null; return; }
+      connected = true; chSt(D().chan.st.connected(ver), "ok");
+      chConnect.textContent = D().install.st.disconnect; chConnect.classList.add("connected");
+      $("chPanel").style.display = "block";
+    } catch(e){ radio = null; }
+  });
+
   K5.onConn(function(open){
     if (open) return;
     connected = false; radio = null;
@@ -1889,6 +1925,18 @@ window.addEventListener("hashchange", routeFromHash);
     $("seRestore").disabled=false;
   });
 
+  onView(async function(name){
+    if (name !== "set" || connected || !K5.sessionOpen()) return;
+    try {
+      var t = await K5.acquire(); if (!t) return;
+      radio = new K5.Radio(t);
+      var ver = await radio.hello(); if (!ver){ radio = null; return; }
+      connected = true; seSt(D().set.st.connected(ver), "ok");
+      seConnect.textContent = D().install.st.disconnect; seConnect.classList.add("connected");
+      $("sePanel").style.display = "block";
+    } catch(e){ radio = null; }
+  });
+
   K5.onConn(function(open){
     if (open) return;
     connected = false; radio = null;
@@ -2035,6 +2083,18 @@ window.addEventListener("hashchange", routeFromHash);
   $("apLogClear").addEventListener("click", function(){ if(logArr.length && confirm(D().ap.confirmClear)){ logArr=[]; save(LOG_KEY,logArr); renderLog(); } });
 
   var lastTo=load(TO_KEY,null); if(lastTo && typeof lastTo==="string") $("amTo").value=lastTo;
+
+  onView(async function(name){
+    if (name !== "aprs" || connected || !K5.sessionOpen()) return;
+    try {
+      t = await K5.acquire(); if (!t) return;
+      radio = new K5.Radio(t);
+      var ver = await radio.hello(); if (!ver){ t = null; radio = null; return; }
+      connected = true; apSt(D().ap.st.connected(ver), "ok");
+      $("apConnect").textContent = D().install.st.disconnect; $("apConnect").classList.add("connected");
+      running = true; monLoop();
+    } catch(e){ t = null; radio = null; }
+  });
 
   K5.onConn(function(open){
     if (open) return;
