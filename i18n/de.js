@@ -79,7 +79,7 @@ T.de = {
         codeintro: "<b>Codes zum Eintippen auf der Tastatur erzeugen</b> (Position, Rufzeichen, Nachricht):",
         codebtn: "Code-Tool öffnen"
       },
-      fine: "Open Source. Firmware & Tools: die UV-K5-APRS-Edition (TA1JS). Installiere unter macOS den WCH-CH34x-Treiber, wenn das Kabel nicht erkannt wird. iOS-Browser haben keinen USB-Zugriff — nimm einen Desktop oder Chrome unter Android mit einem USB-OTG-Kabel (zum Flashen bleibt ein Desktop nötig).",
+      fine: "Open Source. Firmware & Tools: die UV-K5-APRS-Edition (TA1JS). Installiere unter macOS den <a href='https://www.wch-ic.com/downloads/category/67.html'>WCH-CH34x</a>-Treiber, wenn das Kabel nicht erkannt wird. iOS-Browser haben keinen USB-Zugriff — nimm einen Desktop oder Chrome unter Android mit einem USB-OTG-Kabel (zum Flashen bleibt ein Desktop nötig).",
       posPlaceholder: "„Mein GPS verwenden“ drücken",
       on: "Ein", off: "Aus", min: "min",
       skip: "Diesen Schritt überspringen",
