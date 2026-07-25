@@ -224,6 +224,21 @@ var K5 = (function () {
     };
   }
 
+  // ---- one operation at a time on the shared port ------------------------
+  // Every section builds its own Radio, and the APRS monitor reads the port
+  // directly, so nothing used to stop two of them reading at once: a read left
+  // in flight by the section you just left swallowed the reply to the next
+  // section's handshake, which is why switching straight from APRS to Control
+  // left Control saying "Connect Radio" (issue #2). Every send/receive pair
+  // now queues here, FIFO, so a pending read delays the next command instead
+  // of eating its answer.
+  var portQ = Promise.resolve();
+  function withPort(fn) {
+    var next = portQ.then(fn, fn);
+    portQ = next.then(function () {}, function () {});
+    return next;
+  }
+
   // ---- radio: wraps a transport, buffers RX, speaks the command layers ----
   function Radio(transport) { this.t = transport; this.rx = new Uint8Array(0); }
 
@@ -240,10 +255,13 @@ var K5 = (function () {
       if (chunk && chunk.length) this.rx = concat(this.rx, chunk);
     }
   };
-  Radio.prototype._exchange = async function (frame, timeoutMs) {
-    this.rx = new Uint8Array(0);
-    await this.t.send(frame);
-    return this.readFrame(timeoutMs || 2000);
+  Radio.prototype._exchange = function (frame, timeoutMs) {
+    var self = this;
+    return withPort(async function () {
+      self.rx = new Uint8Array(0);
+      await self.t.send(frame);
+      return self.readFrame(timeoutMs || 2000);
+    });
   };
 
   // --- normal-mode commands ---
@@ -364,9 +382,11 @@ var K5 = (function () {
   // 1024-byte buffer, or null - the firmware deliberately answers nothing while
   // APRS listening is on, because the push holds interrupts off for ~270 ms and
   // would destroy a packet being received.
+  // 0x0A03 answers with a raw 1026-byte blob, not a framed reply, so it does
+  // its own read loop — it still has to hold the port lock while doing so.
   Radio.prototype.pollScreen = function (timeoutMs) {
     var self = this;
-    return this._run(async function () {
+    return withPort(async function () {
       self.rx = new Uint8Array(0);
       await self.t.send(frameCommand(0x0A03, new Uint8Array(0)));
       var deadline = Date.now() + (timeoutMs || 1500);
@@ -635,6 +655,7 @@ var K5 = (function () {
 
   return {
     acquire: acquire, release: release, sessionOpen: sessionOpen, onConn: onConn,
+    withPort: withPort,
     crc16: crc16, xorApply: xorApply, frameRaw: frameRaw, frameCommand: frameCommand,
     extractFrame: extractFrame, ch341Divisor: ch341Divisor,
     makeWebSerial: makeWebSerial, makeWebUsb: makeWebUsb, Radio: Radio,
