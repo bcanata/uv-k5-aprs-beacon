@@ -394,8 +394,8 @@
     <p class="status" id="rcStatus"></p>
 
     <div id="rcPanel" style="display:none">
-      <!-- display mirror withdrawn (blocked the radio's interrupts and broke APRS RX):
-      <div class="rc-lcd"><canvas id="rcScreen" width="128" height="64"></canvas></div> -->
+      <div class="rc-lcd"><canvas id="rcScreen" width="128" height="64"></canvas></div>
+      <p class="fine" id="rcScreenNote"></p>
       <div class="rc-state" id="rcState"></div>
 
       <div class="rc-nav">
@@ -775,14 +775,15 @@ var T = {
     },
     control: {
       h1: "Radio Control",
-      lede: "Drive the radio from your browser — virtual keypad, live state readout and TX controls over USB.",
+      lede: "Drive the radio from your browser — live screen, virtual keypad and TX controls over USB.",
       fwnote: "<b>Needs TA1JS v1.1+ firmware</b> with radio control (flash it from the Install tab). Older firmware won't answer control commands.",
       connect: "Connect Radio",
       connected: "Connected",
       up: "", down: "",
       power: "Power", bw: "BW", mod: "Mod",
       ptt: "PTT — hold to transmit",
-      fine: "The on-screen keys behave exactly like the radio's physical keys (settings save on release). PTT transmits while held — use only on frequencies you are licensed for. Frequency, RSSI and battery refresh about twice a second; the radio's own display is not mirrored (that push blocked the radio's interrupts and broke APRS reception).",
+      fine: "The on-screen keys behave exactly like the radio's physical keys (settings save on release). PTT transmits while held — use only on frequencies you are licensed for. The live screen pauses while menu <b>APRS</b> is ON: mirroring the display holds the radio's interrupts off for about a quarter of a second, which would destroy a packet being received.",
+      screenPaused: "Live screen paused — menu APRS is ON. Turn it OFF to mirror the display.",
       st: {
         connecting: "Connecting…",
         connected: function(v){ return "Connected: " + v; },
@@ -1031,14 +1032,15 @@ var T = {
     },
     control: {
       h1: "Telsiz Kontrolü",
-      lede: "Telsizi tarayıcından yönet — sanal tuş takımı, canlı durum bilgisi ve TX kontrolleri USB üzerinden.",
+      lede: "Telsizi tarayıcından yönet — canlı ekran, sanal tuş takımı ve TX kontrolleri USB üzerinden.",
       fwnote: "<b>TA1JS v1.1+ firmware</b> (telsiz kontrolü içeren) gerekir; önce Kurulum sekmesinden yükleyin. Eski firmware kontrol komutlarına yanıt vermez.",
       connect: "Telsizi Bağla",
       connected: "Bağlandı",
       up: "", down: "",
       power: "Güç", bw: "BG", mod: "Mod",
       ptt: "PTT — bas ve konuş",
-      fine: "Ekrandaki tuşlar telsizin gerçek tuşları gibi davranır (ayarlar bırakınca kaydedilir). PTT basılı tutuldukça yayın yapar — yalnızca lisanslı olduğunuz frekanslarda kullanın. Frekans, RSSI ve batarya saniyede iki kez yenilenir; telsizin kendi ekranı yansıtılmıyor (o aktarım telsizin kesmelerini bloklayıp APRS alımını bozuyordu).",
+      fine: "Ekrandaki tuşlar telsizin gerçek tuşları gibi davranır (ayarlar bırakınca kaydedilir). PTT basılı tutuldukça yayın yapar — yalnızca lisanslı olduğunuz frekanslarda kullanın. Menüde <b>APRS</b> ON iken canlı ekran duraklar: ekranı yansıtmak telsizin kesmelerini yaklaşık çeyrek saniye kapatıyor ve o an alınan paketi yok ediyor.",
+      screenPaused: "Canlı ekran duraklatıldı — menüde APRS ON. Yansıtmak için OFF yapın.",
       st: {
         connecting: "Bağlanıyor…",
         connected: function(v){ return "Bağlandı: " + v; },
@@ -1625,7 +1627,7 @@ window.addEventListener("hashchange", routeFromHash);
 /* ======================= RADIO CONTROL ======================= */
 (function(){
   var radio = null, running = false, pollTimer = null, connected = false;
-  // var canvas = $("rcScreen"), ctx = canvas.getContext("2d");   // display mirror withdrawn
+  var canvas = $("rcScreen"), ctx = canvas.getContext("2d");
   var rcConnect = $("rcConnect");
   function rcSt(msg, cls){ var e = $("rcStatus"); e.textContent = msg; e.className = "status " + (cls || ""); }
 
@@ -1637,8 +1639,7 @@ window.addEventListener("hashchange", routeFromHash);
   fillSelect($("rcBw"), ["Wide","Narrow"]);
   fillSelect($("rcMod"), MOD);
 
-  // WITHDRAWN with the 0x0A03 display mirror - see k5.js. Kept for reference.
-  /*
+  // render the 1024-byte paged framebuffer (8 pages x 128 cols, bit0 = top)
   function renderScreen(buf){
     var img = ctx.createImageData(128, 64);
     for (var page = 0; page < 8; page++){
@@ -1656,7 +1657,6 @@ window.addEventListener("hashchange", routeFromHash);
     }
     ctx.putImageData(img, 0, 0);
   }
-  */
 
   function renderState(s){
     if (!s){ $("rcState").innerHTML = ""; return; }
@@ -1679,12 +1679,15 @@ window.addEventListener("hashchange", routeFromHash);
     if (!$("view-control").classList.contains("active")){ pollTimer = setTimeout(loop, 500); return; }
     (async function(){
       try {
-        // display mirror withdrawn - state only (a small reply frame, so the
-        // radio's interrupts stay free for APRS RX)
+        // no frame means the firmware is refusing the mirror because APRS
+        // listening is on - say so instead of leaving a dead canvas
+        var buf = await radio.pollScreen(1200);
+        if (buf){ renderScreen(buf); $("rcScreenNote").textContent = ""; }
+        else { $("rcScreenNote").textContent = D().control.screenPaused; }
         var s = await radio.getState();
         if (s) renderState(s);
       } catch(e){}
-      if (running) pollTimer = setTimeout(loop, 500);
+      if (running) pollTimer = setTimeout(loop, 350);
     })();
   }
 
