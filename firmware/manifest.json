@@ -1,7 +1,7 @@
 {
   "source": "bcanata/uv-k5-firmware-ta1js",
   "commit": "main",
-  "published": "2026-07-25T22:26:40Z",
+  "published": "2026-07-26T09:44:09Z",
   "images": {
     "amateur": {
       "file": "firmware/ta1js-aprs-amateur.bin",
