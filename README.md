@@ -29,3 +29,14 @@ re-implementation. See that repo for the firmware licence and lineage.
 ## Licence
 
 Web tools: [MIT](LICENSE). Firmware: Apache-2.0 (in the firmware repo).
+
+## Sponsorlar / Sponsors
+
+Bu projeyi [GitHub Sponsors](https://github.com/sponsors/bcanata) üzerinden destekleyebilirsiniz.
+Destekçilerin adı (ve kurumsal destekçilerin logosu) aşağıda yer alır.
+
+You can support this project via [GitHub Sponsors](https://github.com/sponsors/bcanata).
+Sponsors are listed below, with logos for organisation-tier sponsors.
+
+<!-- sponsors -->
+<!-- /sponsors -->
